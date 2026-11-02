@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: template-service
+  threads:
+    virtual:
+      enabled: true          # Java 21 virtual threads for request handling
+  mvc:
+    problemdetails:
+      enabled: true
+  # Set per environment (OpenChoreo environment config or secret reference):
+  # SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUERURI=https://<identity provider>/...
+  # Without it the service refuses to start, rather than run unauthenticated.
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true         # /actuator/health/liveness and /readiness for the platform
+      show-details: never
+  observations:
+    key-values:
+      service: ${spring.application.name}
+
+logging:
+  structured:
+    format:
+      console: ecs            # JSON logs; never log request bodies, identifiers or tokens
+
+app:
+  security:
+    enabled: true

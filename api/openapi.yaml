@@ -1,0 +1,52 @@
+openapi: 3.1.0
+info:
+  title: Template service API
+  version: 1.0.0
+  description: >
+    Rename and extend when you create a repo from this template. Versioned under /api/v1;
+    change it by expanding first, never by breaking. Errors are RFC 9457 problem details.
+servers:
+  - url: /api/v1
+security:
+  - bearer: []
+paths:
+  /greetings:
+    get:
+      operationId: getGreeting
+      summary: Greet someone by name
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 100 }
+      responses:
+        "200":
+          description: The greeting
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Greeting" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    Greeting:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+    Problem:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+  responses:
+    Problem:
+      description: An error, as a problem detail
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
