@@ -12,7 +12,7 @@ Everything below is wired to the platform's gates, so a new repo is deliverable 
 | Build | Gradle 9.8 wrapper, version catalog, configuration cache | Reproducible builds; one place for versions |
 | API | Versioned `/api/v1`, OpenAPI 3.1 in `api/openapi.yaml`, RFC 9457 problem details | Contract-first; errors never echo request data |
 | Security | OAuth 2.0 resource server (JWT), stateless, deny by default; only health probes open | Secure by default; the service refuses to start without an issuer |
-| Unit tests | JUnit 6, AssertJ, MockMvc for the web layer; JaCoCo line coverage of at least 70% | Fast feedback; the floor the platform requires |
+| Unit tests | JUnit 6, AssertJ, MockMvc for the web layer; JaCoCo line coverage of at least 90% | Fast feedback; the floor the platform requires (VX-11) |
 | Contract tests | Pact provider verification (`./gradlew contractTest`) | Consumers can't be broken silently |
 | Deployed checks | `DeployedSmokeTest` (tag `deployed`) against `BASE_URL` | Integration in dev, end-to-end in staging, smoke in production |
 | Observability | Actuator liveness and readiness, Prometheus metrics, ECS JSON logs | Platform probes and dashboards work without extra setup |
