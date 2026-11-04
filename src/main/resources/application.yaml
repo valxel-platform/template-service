@@ -40,3 +40,9 @@ logging:
 app:
   security:
     enabled: true
+  # Feature flags: the product's Flipt, read over OFREP. Unset, every flag reads as off.
+  flags:
+    url: ${FLAGS_URL:}
+    environment: ${FLAGS_ENVIRONMENT:}   # e.g. production
+    namespace: ${FLAGS_NAMESPACE:}       # e.g. emr
+    token: ${FLAGS_TOKEN:}               # only if the product's Flipt requires one for evaluation

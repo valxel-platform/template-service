@@ -15,6 +15,7 @@ Everything below is wired to the platform's gates, so a new repo is deliverable 
 | Unit tests | JUnit 6, AssertJ, MockMvc for the web layer; JaCoCo line coverage of at least 90% | Fast feedback; the floor the platform requires (VX-11) |
 | Contract tests | Pact provider verification (`./gradlew contractTest`) | Consumers can't be broken silently |
 | Deployed checks | `DeployedSmokeTest` (tag `deployed`) against `BASE_URL` | Integration in dev, end-to-end in staging, smoke in production |
+| Feature flags | OpenFeature with an OFREP provider for the product's Flipt (`FLAGS_URL`); `Flags.enabled(key, user)` | New behavior ships dark; the SDLC tool creates the flag and turns it on at release |
 | Observability | Actuator liveness and readiness, Prometheus metrics, ECS JSON logs | Platform probes and dashboards work without extra setup |
 | Image | Multi-stage Dockerfile, Boot layers, distroless JRE, non-root | Small, cache-friendly, minimal attack surface |
 | Supply chain | Actions pinned by commit SHA, Gradle wrapper validation, dependency graph submission, dependency review, Dependabot | Known inputs; vulnerable dependencies are caught on the PR |
@@ -44,6 +45,25 @@ deployment is ready (or by hand with **Run workflow**).
 
 Deployed environments set `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUERURI` to the product's
 identity provider. Secrets come from OpenChoreo secret references, never from the repo.
+
+## Feature flags
+
+The Vrixel SDLC creates a flag for each feature in the product's Flipt when its design is
+approved (on in dev and staging, off in production until release). Put the new behavior behind it:
+
+```java
+if (flags.enabled("emr.emr-feat-3.check-in-kiosk", user)) {
+    // the new behavior
+} else {
+    // today's behavior
+}
+```
+
+`com.vrixel.service.flags` reads flags over OFREP from the product's Flipt. Set per environment:
+`FLAGS_URL` (e.g. `http://flipt.emr.svc:8080`), `FLAGS_ENVIRONMENT` (e.g. `production`),
+`FLAGS_NAMESPACE` (e.g. `emr`) and, if the product's Flipt requires it for evaluation,
+`FLAGS_TOKEN`. Without `FLAGS_URL`, or when Flipt can't be reached, every flag reads as off. Tests
+set flags with OpenFeature's `InMemoryProvider` (see `FlagsTest`).
 
 ## After creating a repo from this template
 
