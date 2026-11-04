@@ -75,7 +75,7 @@ tasks.jacocoTestReport {
     }
 }
 
-// The platform's floor; products may raise it (governance/product.yaml quality.unit.min_coverage).
+// The platform's floor; products may raise it (<product>-governance/product.yaml quality.unit.min_coverage).
 tasks.jacocoTestCoverageVerification {
     dependsOn(tasks.jacocoTestReport)
     violationRules {
