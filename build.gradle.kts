@@ -22,6 +22,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
+    implementation("org.apache.kafka:kafka-clients")
     implementation(libs.openfeature.sdk)
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
@@ -73,7 +75,7 @@ tasks.jacocoTestReport {
     }
 }
 
-// The platform's floor; products may raise it (governance/product.yaml quality.unit.min_coverage).
+// The platform's floor; products may raise it (<product>-governance/product.yaml quality.unit.min_coverage).
 tasks.jacocoTestCoverageVerification {
     dependsOn(tasks.jacocoTestReport)
     violationRules {
