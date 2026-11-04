@@ -1,7 +1,7 @@
 # One place for versions. Dependabot proposes updates here and in the Gradle wrapper.
 [versions]
 spring-boot = "4.1.2"
-pact = "4.7.5"
+pact = "4.7.6"
 
 [libraries]
 pact-provider-junit5 = { module = "au.com.dius.pact.provider:junit5", version.ref = "pact" }
