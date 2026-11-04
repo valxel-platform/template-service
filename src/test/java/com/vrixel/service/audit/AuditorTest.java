@@ -77,7 +77,7 @@ class AuditorTest {
         AuditProperties p = new AuditProperties(null, null, " ", null, null, null, null, null, null);
         assertThat(p.sink()).isEqualTo("log");
         assertThat(p.topic()).isEqualTo("audit.v1");
-        assertThat(p.required()).isTrue();
+        assertThat(p.isRequired()).isTrue();
         assertThat(p.timeoutMs()).isEqualTo(5000);
         assertThat(p.dataClass()).isEqualTo("general");
         assertThat(p.kafka()).isEmpty();

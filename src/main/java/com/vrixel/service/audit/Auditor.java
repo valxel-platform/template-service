@@ -94,7 +94,7 @@ public class Auditor {
         try {
             sink.publish(subject, Json.write(event));
         } catch (RuntimeException e) {
-            if (props.required()) {
+            if (props.isRequired()) {
                 throw e instanceof AuditUnavailableException a
                         ? a
                         : new AuditUnavailableException("audit record could not be published", e);

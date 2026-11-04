@@ -45,7 +45,7 @@ public record AuditProperties(
     }
 
     /** Whether to fail actions whose records can't be published. */
-    public boolean required() {
+    public boolean isRequired() {
         return Boolean.TRUE.equals(required);
     }
 }
