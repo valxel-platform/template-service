@@ -16,7 +16,8 @@ Everything below is wired to the platform's gates, so a new repo is deliverable 
 | Contract tests | Pact provider verification (`./gradlew contractTest`) | Consumers can't be broken silently |
 | Deployed checks | `DeployedSmokeTest` (tag `deployed`) against `BASE_URL` | Integration in dev, end-to-end in staging, smoke in production |
 | Feature flags | OpenFeature with an OFREP provider for the product's Flipt (`FLAGS_URL`); `Flags.enabled(key, user)` | New behavior ships dark; the SDLC tool creates the flag and turns it on at release |
-| Observability | Actuator liveness and readiness, Prometheus metrics, ECS JSON logs | Platform probes and dashboards work without extra setup |
+| Observability | Actuator liveness and readiness, Prometheus metrics, ECS JSON logs with trace ids, OpenTelemetry traces (`spring-boot-starter-opentelemetry`) exported to the data plane's collector | Platform probes and dashboards work without extra setup; one request can be followed across services |
+| Audit | `Auditor` publishes who did what to which records (CloudEvents `vrixel.audit.v1`) to the product's Kafka audit topic; if a record can't be published the request fails with 503 | Access to PHI and payments data is on record, in an append-only, hash-chained store with an object-storage backup (ss-audit-sink) |
 | Image | Multi-stage Dockerfile, Boot layers, distroless JRE, non-root | Small, cache-friendly, minimal attack surface |
 | Supply chain | Actions pinned by commit SHA, Gradle wrapper validation, dependency graph submission, dependency review, Dependabot | Known inputs; vulnerable dependencies are caught on the PR |
 
@@ -64,6 +65,22 @@ if (flags.enabled("emr.emr-feat-3.check-in-kiosk", user)) {
 `FLAGS_NAMESPACE` (e.g. `emr`) and, if the product's Flipt requires it for evaluation,
 `FLAGS_TOKEN`. Without `FLAGS_URL`, or when Flipt can't be reached, every flag reads as off. Tests
 set flags with OpenFeature's `InMemoryProvider` (see `FlagsTest`).
+
+## Audit and tracing
+
+Record every read and change of product data with the `Auditor` (`com.vrixel.service.audit`):
+
+```java
+auditor.record("patient.read", Actor.user(jwt.getSubject()), "patient", List.of(patientId));
+```
+
+Records hold ids, never field values. Settings: `AUDIT_SINK` (`kafka` in deployed environments,
+`log` locally), `AUDIT_KAFKA_BOOTSTRAP`, `AUDIT_TOPIC`, `AUDIT_REQUIRED` (default `true`),
+`PRODUCT`, `ENVIRONMENT`, `DATA_CLASS`; extra Kafka client settings go under `app.audit.kafka`.
+
+Traces export when `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT` points at the data
+plane's collector (e.g. `http://otel-collector:4318/v1/traces`); incoming `traceparent` headers
+are honored, and logs and audit records carry the trace id.
 
 ## After creating a repo from this template
 
