@@ -31,6 +31,17 @@ management:
   observations:
     key-values:
       service: ${spring.application.name}
+  # Traces: OpenTelemetry, exported over OTLP when the data plane's collector is set, e.g.
+  # MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT=http://otel-collector:4318/v1/traces
+  # The collector samples, so the service records every trace it takes part in.
+  tracing:
+    sampling:
+      probability: 1.0
+  # Metrics stay on /actuator/prometheus (the platform scrapes it); OTLP metrics push is off.
+  otlp:
+    metrics:
+      export:
+        enabled: false
 
 logging:
   structured:
@@ -40,6 +51,16 @@ logging:
 app:
   security:
     enabled: true
+  # Audit trail (com.vrixel.service.audit): kafka in deployed environments, log locally.
+  audit:
+    sink: ${AUDIT_SINK:log}
+    bootstrap: ${AUDIT_KAFKA_BOOTSTRAP:}
+    topic: ${AUDIT_TOPIC:audit.v1}
+    required: ${AUDIT_REQUIRED:true}     # a request whose audit record can't be published fails (503)
+    product: ${PRODUCT:}
+    environment: ${ENVIRONMENT:}
+    data-class: ${DATA_CLASS:general}    # general | phi | payments
+    # kafka: { security.protocol: SASL_SSL, sasl.mechanism: SCRAM-SHA-512, sasl.jaas.config: ... }
   # Feature flags: the product's Flipt, read over OFREP. Unset, every flag reads as off.
   flags:
     url: ${FLAGS_URL:}
