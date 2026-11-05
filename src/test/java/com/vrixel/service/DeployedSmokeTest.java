@@ -22,11 +22,15 @@ class DeployedSmokeTest {
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private final String baseUrl = System.getenv("BASE_URL");
 
+    /** Health is on the internal management port (platform only), so readiness is proven through the API. */
     @Test
-    void isReady() throws Exception {
+    void answersAnAuthorizedCaller() throws Exception {
+        String token = System.getenv("API_TOKEN");
         assumeTrue(baseUrl != null && !baseUrl.isBlank(), "BASE_URL is not set");
+        assumeTrue(token != null && !token.isBlank(), "API_TOKEN is not set");
         HttpResponse<String> res = http.send(
-                HttpRequest.newBuilder(URI.create(baseUrl + "/actuator/health/readiness")).GET().build(),
+                HttpRequest.newBuilder(URI.create(baseUrl + "/api/v1/greetings?name=smoke"))
+                        .header("Authorization", "Bearer " + token).GET().build(),
                 HttpResponse.BodyHandlers.ofString());
         assertThat(res.statusCode()).isEqualTo(200);
     }

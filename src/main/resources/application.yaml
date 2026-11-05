@@ -7,9 +7,6 @@ spring:
   mvc:
     problemdetails:
       enabled: true
-  # Set per environment (OpenChoreo environment config or secret reference):
-  # SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUERURI=https://<identity provider>/...
-  # Without it the service refuses to start, rather than run unauthenticated.
 
 server:
   port: ${PORT:8080}
@@ -19,6 +16,10 @@ server:
     include-stacktrace: never
 
 management:
+  # Health and metrics on an internal port: no endpoint in workload.yaml exposes it, so only the
+  # platform (probes, Prometheus) reaches it, and the API port serves the API alone.
+  server:
+    port: ${MANAGEMENT_PORT:8081}
   endpoints:
     web:
       exposure:
@@ -51,6 +52,11 @@ logging:
 app:
   security:
     enabled: true
+    # The product's Keycloak realm (com.vrixel.service.security). Without both, the service refuses
+    # to start rather than run unauthenticated or accept tokens issued for anything else.
+    issuer: ${APP_ISSUER:}                     # https://id.<domain>/realms/<product>
+    audience: ${APP_AUDIENCE:}                 # the product's API audience, e.g. emr-api
+    tenant-claim: ${APP_TENANT_CLAIM:tenant}   # the token claim naming the caller's tenant (Keycloak: organization)
   # Audit trail (com.vrixel.service.audit): kafka in deployed environments, log locally.
   audit:
     sink: ${AUDIT_SINK:log}

@@ -10,6 +10,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.vrixel.service.audit.RecordingSink;
 import com.vrixel.service.config.ApiExceptionHandler;
 import com.vrixel.service.events.RecordingEventSink;
+import com.vrixel.service.security.Callers;
+import com.vrixel.service.security.TenantAccessPolicy;
+import java.time.Instant;
+import java.util.Map;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -23,6 +29,17 @@ class GreetingControllerTest {
     private MockMvc mvc;
     private final RecordingSink audit = new RecordingSink();
     private final RecordingEventSink events = new RecordingEventSink();
+    private final Callers callers = new Callers("tenant");
+
+    /** A user of clinic-1, calling through the BFF (azp). */
+    static JwtAuthenticationToken user(String tenant) {
+        Jwt.Builder jwt = Jwt.withTokenValue("t").header("alg", "RS256").subject("user-1")
+                .claim("azp", "emr-bff").issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60));
+        if (tenant != null) {
+            jwt.claim("tenant", tenant);
+        }
+        return new JwtAuthenticationToken(jwt.build());
+    }
 
     @BeforeEach
     void setUp() {
@@ -30,7 +47,8 @@ class GreetingControllerTest {
         validator.afterPropertiesSet();
         mvc = MockMvcBuilders.standaloneSetup(
                         new GreetingController(
-                                new GreetingService(), RecordingSink.auditor(audit, true), RecordingEventSink.events(events)))
+                                new GreetingService(), RecordingSink.auditor(audit, true), RecordingEventSink.events(events),
+                                callers, new TenantAccessPolicy(callers)))
                 .setControllerAdvice(new ApiExceptionHandler())
                 .setValidator(validator)
                 .build();
@@ -75,7 +93,7 @@ class GreetingControllerTest {
     @Test
     void aCommandIsAnEventOnKafkaAndIsAccepted() throws Exception {
         mvc.perform(put("/api/v1/greetings/g-1").contentType(MediaType.APPLICATION_JSON).content(BODY)
-                        .header("Idempotency-Key", "k1"))
+                        .header("Idempotency-Key", "k1").principal(user("clinic-1")))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.status").value("accepted"))
                 .andExpect(jsonPath("$.eventId").value(events.sent.getFirst().headers().get("ce_id")));
@@ -87,12 +105,27 @@ class GreetingControllerTest {
         // Audited by id only: the record never holds the name or the message.
         assertThat(audit.events.getFirst().read("$.data.action", String.class)).isEqualTo("greeting.save");
         assertThat(audit.events.getFirst().jsonString()).contains("g-1").doesNotContain("Ada");
+        // Who acted for whom: the user, and the client that called on their behalf.
+        assertThat(audit.events.getFirst().read("$.data.actor.id", String.class)).isEqualTo("user-1");
+        assertThat(audit.events.getFirst().read("$.data.actor.client", String.class)).isEqualTo("emr-bff");
+        assertThat(sent.event().read("$.data.tenant", String.class)).isEqualTo("clinic-1");
+    }
+
+    @Test
+    void aCallerWithoutATenantChangesNothing() throws Exception {
+        mvc.perform(put("/api/v1/greetings/g-1").contentType(MediaType.APPLICATION_JSON).content(BODY)
+                        .principal(user(null)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("Not allowed."));
+        assertThat(events.sent).isEmpty();
+        assertThat(audit.events).isEmpty();
     }
 
     @Test
     void whenKafkaIsDownNothingChangesAndTheCallerRetries() throws Exception {
         events.fail = true;
-        mvc.perform(put("/api/v1/greetings/g-1").contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(put("/api/v1/greetings/g-1").contentType(MediaType.APPLICATION_JSON).content(BODY)
+                        .principal(user("clinic-1")))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.detail").value(
