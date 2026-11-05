@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.jayway.jsonpath.DocumentContext;
+import com.vrixel.service.json.Json;
 import io.micrometer.tracing.Tracer;
 import java.time.Clock;
 import java.time.Instant;

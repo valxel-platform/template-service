@@ -32,4 +32,15 @@ class GreetingServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("name must not be blank");
     }
+
+    @Test
+    void aCommandIsCheckedBeforeItsEventIsPublished() {
+        assertThat(service.validate(new SaveGreeting(" Ada ", "  Hi  "))).isEqualTo("Hi");
+        assertThatThrownBy(() -> service.validate(new SaveGreeting("Ada", " ")))
+                .hasMessage("message must not be blank");
+        assertThatThrownBy(() -> service.validate(new SaveGreeting("Ada", "x".repeat(201))))
+                .hasMessage("message must be at most 200 characters");
+        assertThatThrownBy(() -> service.validate(new SaveGreeting(" ", "Hi")))
+                .hasMessage("name must not be blank");
+    }
 }

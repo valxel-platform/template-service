@@ -17,6 +17,7 @@ Everything below is wired to the platform's gates, so a new repo is deliverable 
 | Deployed checks | `DeployedSmokeTest` (tag `deployed`) against `BASE_URL` | Integration in dev, end-to-end in staging, smoke in production |
 | Feature flags | OpenFeature with an OFREP provider for the product's Flipt (`FLAGS_URL`); `Flags.enabled(key, user)` | New behavior ships dark; the SDLC tool creates the flag and turns it on at release |
 | Observability | Actuator liveness and readiness, Prometheus metrics, ECS JSON logs with trace ids, OpenTelemetry traces (`spring-boot-starter-opentelemetry`) exported to the data plane's collector | Platform probes and dashboards work without extra setup; one request can be followed across services |
+| Events | Commands publish one CloudEvent to Kafka (`Events.publish`) and answer 202; event workers keep the data stores up to date. Kafka down means 503 and no change | No dual writes (VX-16): Kafka is the record, and every database can be rebuilt from it |
 | Audit | `Auditor` publishes who did what to which records (CloudEvents `vrixel.audit.v1`) to the product's Kafka audit topic; if a record can't be published the request fails with 503 | Access to PHI and payments data is on record, in an append-only, hash-chained store with an object-storage backup (ss-audit-sink) |
 | Image | Multi-stage Dockerfile, Boot layers, distroless JRE, non-root | Small, cache-friendly, minimal attack surface |
 | Supply chain | Actions pinned by commit SHA, Gradle wrapper validation, dependency graph submission, dependency review, Dependabot | Known inputs; vulnerable dependencies are caught on the PR |
@@ -65,6 +66,29 @@ if (flags.enabled("emr.emr-feat-3.check-in-kiosk", user)) {
 `FLAGS_NAMESPACE` (e.g. `emr`) and, if the product's Flipt requires it for evaluation,
 `FLAGS_TOKEN`. Without `FLAGS_URL`, or when Flipt can't be reached, every flag reads as off. Tests
 set flags with OpenFeature's `InMemoryProvider` (see `FlagsTest`).
+
+## Changing state: Kafka first
+
+A request that changes state doesn't write a database. It checks the command, publishes one event
+saying what changed, and answers 202 Accepted once Kafka holds it on every in-sync replica
+(`com.vrixel.service.events`, example: `PUT /api/v1/greetings/{id}`):
+
+```java
+Events.Published p = events.publish("patients", "registered", patientId, data, idempotencyKey);
+return ResponseEntity.accepted().body(Accepted.of(p.eventId()));
+```
+
+- Topic `<prefix>.<entity>.v1` (`EVENTS_TOPIC_PREFIX`, e.g. `emr.intake-api`), keyed by the record's
+  id so its changes stay in order; type `vrixel.<entity>.<what happened>.v1`.
+- Kafka doesn't confirm in time (`EVENTS_TIMEOUT_MS`): 503, nothing changed. Retries with the same
+  `Idempotency-Key` get the same event id, so workers apply them once.
+- The data stores (Postgres, a search index, a cache) are kept by event workers, from
+  `vrixel-tools/template-event-worker`, and can be rebuilt by replaying the topic. Reads come from
+  them, so a change shows up once a worker has applied it, usually within a second.
+- Never write to a database and to Kafka in the same request (constitution VX-16).
+
+Settings: `EVENTS_SINK` (`kafka` in deployed environments, `log` locally), `EVENTS_KAFKA_BOOTSTRAP`,
+`EVENTS_TOPIC_PREFIX`, `EVENTS_SOURCE`; extra Kafka client settings go under `app.events.kafka`.
 
 ## Audit and tracing
 
