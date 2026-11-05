@@ -1,6 +1,7 @@
 package com.vrixel.service.config;
 
 import com.vrixel.service.audit.AuditUnavailableException;
+import com.vrixel.service.events.EventsUnavailableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -24,5 +25,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     public ProblemDetail auditUnavailable(AuditUnavailableException ex) {
         return ProblemDetail.forStatusAndDetail(
                 HttpStatus.SERVICE_UNAVAILABLE, "The audit trail is unavailable, so the request was not completed. Try again.");
+    }
+
+    /** The change is not on record in Kafka, so it did not happen (see com.vrixel.service.events). */
+    @ExceptionHandler(EventsUnavailableException.class)
+    public ProblemDetail eventsUnavailable(EventsUnavailableException ex) {
+        return ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "The change could not be recorded, so nothing changed. Try again with the same Idempotency-Key.");
     }
 }

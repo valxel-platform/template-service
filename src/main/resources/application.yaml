@@ -61,6 +61,15 @@ app:
     environment: ${ENVIRONMENT:}
     data-class: ${DATA_CLASS:general}    # general | phi | payments
     # kafka: { security.protocol: SASL_SSL, sasl.mechanism: SCRAM-SHA-512, sasl.jaas.config: ... }
+  # Domain events (com.vrixel.service.events): every change is published to Kafka first, and the
+  # event workers keep the data stores up to date. kafka in deployed environments, log locally.
+  events:
+    sink: ${EVENTS_SINK:log}
+    bootstrap: ${EVENTS_KAFKA_BOOTSTRAP:}
+    topic-prefix: ${EVENTS_TOPIC_PREFIX:local.template-service}   # topics are <prefix>.<entity>.v1
+    source: ${EVENTS_SOURCE:}                                     # e.g. emr/intake-api
+    timeout-ms: ${EVENTS_TIMEOUT_MS:5000}
+    # kafka: { security.protocol: SASL_SSL, sasl.mechanism: SCRAM-SHA-512, sasl.jaas.config: ... }
   # Feature flags: the product's Flipt, read over OFREP. Unset, every flag reads as off.
   flags:
     url: ${FLAGS_URL:}

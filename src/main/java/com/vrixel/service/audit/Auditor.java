@@ -1,5 +1,6 @@
 package com.vrixel.service.audit;
 
+import com.vrixel.service.json.Json;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;

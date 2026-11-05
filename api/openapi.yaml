@@ -27,6 +27,37 @@ paths:
               schema: { $ref: "#/components/schemas/Greeting" }
         "400": { $ref: "#/components/responses/Problem" }
         "401": { $ref: "#/components/responses/Problem" }
+  /greetings/{id}:
+    put:
+      operationId: saveGreeting
+      summary: Save a custom greeting
+      description: >
+        Publishes a greeting.saved event to Kafka and answers once Kafka holds it. The read models
+        show the change once the event workers have applied it. 503 means nothing changed: retry
+        with the same Idempotency-Key.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[a-z0-9][a-z0-9-]{0,63}$" }
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string, maxLength: 200 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveGreeting" }
+      responses:
+        "202":
+          description: Accepted; the event workers will apply it
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Accepted" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     bearer: { type: http, scheme: bearer, bearerFormat: JWT }
@@ -36,6 +67,18 @@ components:
       required: [message]
       properties:
         message: { type: string }
+    SaveGreeting:
+      type: object
+      required: [name, message]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        message: { type: string, minLength: 1, maxLength: 200 }
+    Accepted:
+      type: object
+      required: [eventId, status]
+      properties:
+        eventId: { type: string }
+        status: { type: string, enum: [accepted] }
     Problem:
       type: object
       properties:

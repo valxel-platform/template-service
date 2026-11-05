@@ -43,7 +43,8 @@ public class AuditConfig {
         return new Auditor(sink, props, service, Clock.systemUTC(), () -> traceIds(tracer.getIfAvailable()));
     }
 
-    static String[] traceIds(Tracer tracer) {
+    /** The current trace and span ids, or empty strings outside a trace. */
+    public static String[] traceIds(Tracer tracer) {
         Span span = tracer == null ? null : tracer.currentSpan();
         if (span == null) {
             return new String[] {"", ""};

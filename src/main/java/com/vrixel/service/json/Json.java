@@ -1,14 +1,14 @@
-package com.vrixel.service.audit;
+package com.vrixel.service.json;
 
 import java.util.Collection;
 import java.util.Map;
 
-/** Just enough JSON for audit records: maps, collections, strings, numbers, booleans and null. */
-final class Json {
+/** Just enough JSON for audit records and events: maps, collections, strings, numbers, booleans and null. */
+public final class Json {
 
     private Json() {}
 
-    static String write(Object value) {
+    public static String write(Object value) {
         StringBuilder out = new StringBuilder();
         write(value, out);
         return out.toString();
