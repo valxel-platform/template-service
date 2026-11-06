@@ -11,7 +11,7 @@ Everything below is wired to the platform's gates, so a new repo is deliverable 
 | Runtime | Java 21, Spring Boot 4.1, virtual threads | LTS Java; current Boot line; cheap concurrency for I/O-bound APIs |
 | Build | Gradle 9.8 wrapper, version catalog, configuration cache | Reproducible builds; one place for versions |
 | API | Versioned `/api/v1`, OpenAPI 3.1 in `api/openapi.yaml`, RFC 9457 problem details | Contract-first; errors never echo request data |
-| Security | OAuth 2.0 resource server (JWT), stateless, deny by default; only health probes open | Secure by default; the service refuses to start without an issuer |
+| Security | Tokens from the product's Keycloak realm, issued for this product (`APP_AUDIENCE`); `@PreAuthorize` on every endpoint (a test fails the build otherwise); record-level `AccessPolicy` (tenants apart by default); token forward or exchange for outgoing calls | VX-17: who, what and which record on every request; the service refuses to start without issuer and audience |
 | Unit tests | JUnit 6, AssertJ, MockMvc for the web layer; JaCoCo line coverage of at least 90% | Fast feedback; the floor the platform requires (VX-11) |
 | Contract tests | Pact provider verification (`./gradlew contractTest`) | Consumers can't be broken silently |
 | Deployed checks | `DeployedSmokeTest` (tag `deployed`) against `BASE_URL` | Integration in dev, end-to-end in staging, smoke in production |
@@ -47,6 +47,38 @@ deployment is ready (or by hand with **Run workflow**).
 
 Deployed environments set `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUERURI` to the product's
 identity provider. Secrets come from OpenChoreo secret references, never from the repo.
+
+## Security
+
+Every request is checked for **who**, **what** and **which record** (`com.vrixel.service.security`):
+
+1. **Who.** A JWT from the product's Keycloak realm (`APP_ISSUER`), checked against the realm's
+   published keys (rotation is picked up by `kid`), not expired, and issued for this product:
+   `aud` must contain `APP_AUDIENCE` (e.g. `emr-api`). A token for another product is refused.
+2. **What.** Every endpoint declares its permission:
+   `@PreAuthorize("hasAuthority('SCOPE_greetings:write')")`. Scopes become `SCOPE_*`, Keycloak realm
+   roles `ROLE_*`; a permission scope counts only if the person also holds it (the realm's
+   `permissions` claim), so what the app asked for and what the person may do must both allow it. Paths outside `/api` are denied, and `EndpointPermissionsTest` fails the build
+   for an endpoint without `@PreAuthorize`.
+3. **Which record.** `AccessPolicy.require(caller, new Resource(type, id, tenant), action)` in every
+   handler that touches a record. The default keeps tenants apart (`APP_TENANT_CLAIM`, Keycloak's
+   `organization`); replace the bean to ask OpenFGA or OPA for relationship rules. Refusals are 403
+   with no detail.
+
+Audit records name the user (`sub`) and the client acting for them (`azp`).
+
+**Calling other services** (`app.outbound`, `BearerFor`):
+
+| Target | Mode | Why |
+| --- | --- | --- |
+| Same product | `forward` | The mesh (Istio ambient mTLS) proves which service calls; the token proves which user |
+| Another product, a shared service, PHI stores, payments | `exchange` | RFC 8693 at Keycloak: a token for that service only, with only the scopes needed; cached per caller and target |
+
+Exchange authenticates with `private_key_jwt` (`client-key-file`) rather than a shared secret when
+it can. There is no fallback to the service's own identity on a user's behalf.
+
+**Exposure.** `workload.yaml` declares one endpoint, `api`, visible to its project. Health and
+metrics are on the management port (`MANAGEMENT_PORT`, 8081), which no endpoint exposes.
 
 ## Feature flags
 

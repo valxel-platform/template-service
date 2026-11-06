@@ -1,0 +1,30 @@
+# OpenChoreo workload descriptor: how this component runs and who may reach it. The build turns it
+# into the component's Workload; OpenChoreo creates the gateway routes and network policies from it.
+apiVersion: openchoreo.dev/v1alpha1
+metadata:
+  name: template-service
+endpoints:
+  - name: api
+    port: 8080
+    type: HTTP
+    basePath: /api
+    schemaFile: api/openapi.yaml
+    # Who may call it (constitution VX-17). Every endpoint is reachable within its project; add
+    # "namespace" only when another project calls it. Never "external": the internet reaches the
+    # product through its BFF (web) or the gateway's API route (mobile, partners), approved at G4.
+    visibility:
+      - project
+# The services this one calls, so OpenChoreo allows that traffic and passes their addresses in:
+# dependencies:
+#   endpoints:
+#     - component: emr-chart-api
+#       name: api
+#       visibility: project
+#       envBindings:
+#         address: CHART_API_URL
+configurations:
+  env:
+    - name: APP_AUDIENCE
+      value: template-api        # the product's API audience in its Keycloak realm, e.g. emr-api
+    - name: MANAGEMENT_PORT
+      value: "8081"              # health and metrics: platform only, never an endpoint

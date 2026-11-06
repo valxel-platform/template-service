@@ -30,6 +30,7 @@ jobs:
     env:
       STAGE: ${{ github.event.client_payload.stage || inputs.stage }}
       BASE_URL: ${{ github.event.client_payload.base_url || inputs.base_url }}
+      API_TOKEN: ${{ secrets.API_TOKEN }}       # a test identity's token for this environment (health is internal)
       REPORT_SHA: ${{ github.event.client_payload.sha || inputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
