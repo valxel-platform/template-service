@@ -11,7 +11,11 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Value;
+import com.vrixel.service.security.AccessPolicy;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 
 /**
  * Verifies every consumer's pact against the running application. Pacts are read from
@@ -38,6 +42,19 @@ class PactProviderTest {
     @ExtendWith(PactVerificationInvocationContextProvider.class)
     void verifyPact(PactVerificationContext context) {
         context.verifyInteraction();
+    }
+
+    /**
+     * Contracts cover the API's shape; who may change which record is the access tests' job
+     * (SecurityTest). Without a signed-in caller there is no tenant, so allow every record here.
+     */
+    @TestConfiguration
+    static class AnyRecord {
+        @Bean
+        @Primary
+        AccessPolicy anyRecord() {
+            return (caller, resource, action) -> {};
+        }
     }
 
     @State("greetings are available")
