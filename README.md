@@ -136,7 +136,20 @@ Records hold ids, never field values. Settings: `AUDIT_SINK` (`kafka` in deploye
 
 Traces export when `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT` points at the data
 plane's collector (e.g. `http://otel-collector:4318/v1/traces`); incoming `traceparent` headers
-are honored, and logs and audit records carry the trace id.
+are honored, and logs and audit records carry the trace id. Every response carries a W3C
+`traceresponse` header (`TraceResponseFilter`): the web and mobile apps put its trace id on the errors
+they report, which is how the SDLC tool tells that a failure people saw and an error here are one
+incident.
+
+## Error reports
+
+With `SENTRY_DSN` set, unhandled exceptions and `ERROR` logs go to Sentry (Spring Boot integration
+and Logback appender), grouped into issues; Sentry's issue alerts reach the SDLC tool as incident
+signals. `ErrorReports` keeps the exception type, stack, endpoint path and method, the log message's
+pattern and a `trace_id` tag, and removes exception messages, formatted messages and arguments,
+query strings, headers, bodies, users and breadcrumbs. Unset, Sentry is off. Also `ENVIRONMENT`
+and `SENTRY_RELEASE` (the image tag). For PHI products use a Sentry plan under a BAA, or self-hosted
+Sentry. Logs, traces and metrics stay in OpenChoreo.
 
 ## After creating a repo from this template
 

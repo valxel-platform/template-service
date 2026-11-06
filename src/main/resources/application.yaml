@@ -49,6 +49,18 @@ logging:
     format:
       console: ecs            # JSON logs; never log request bodies, identifiers or tokens
 
+# Error reports (com.vrixel.service.observability.ErrorReports). Sentry starts only when SENTRY_DSN
+# is set (no sentry.dsn here, so an unset DSN leaves Sentry off entirely). Unhandled exceptions and
+# ERROR logs become events, grouped into issues; their alerts reach the SDLC tool.
+sentry:
+  environment: ${ENVIRONMENT:local}
+  release: ${SENTRY_RELEASE:}
+  send-default-pii: false
+  max-request-body-size: none
+  logging:
+    minimum-event-level: error
+    minimum-breadcrumb-level: error
+
 app:
   security:
     enabled: true

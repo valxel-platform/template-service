@@ -3,9 +3,12 @@
 spring-boot = "4.1.2"
 openfeature = "1.23.0"
 pact = "4.7.6"
+# Sentry (errors only, when SENTRY_DSN is set): the Spring Boot 4 integration and the Logback appender.
+sentry = "8.61.0"
 
 [libraries]
 openfeature-sdk = { module = "dev.openfeature:sdk", version.ref = "openfeature" }
+sentry-bom = { module = "io.sentry:sentry-bom", version.ref = "sentry" }
 pact-provider-junit5 = { module = "au.com.dius.pact.provider:junit5", version.ref = "pact" }
 
 [plugins]
