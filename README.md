@@ -57,7 +57,8 @@ Every request is checked for **who**, **what** and **which record** (`com.vrixel
    `aud` must contain `APP_AUDIENCE` (e.g. `emr-api`). A token for another product is refused.
 2. **What.** Every endpoint declares its permission:
    `@PreAuthorize("hasAuthority('SCOPE_greetings:write')")`. Scopes become `SCOPE_*`, Keycloak realm
-   roles `ROLE_*`. Paths outside `/api` are denied, and `EndpointPermissionsTest` fails the build
+   roles `ROLE_*`; a permission scope counts only if the person also holds it (the realm's
+   `permissions` claim), so what the app asked for and what the person may do must both allow it. Paths outside `/api` are denied, and `EndpointPermissionsTest` fails the build
    for an endpoint without `@PreAuthorize`.
 3. **Which record.** `AccessPolicy.require(caller, new Resource(type, id, tenant), action)` in every
    handler that touches a record. The default keeps tenants apart (`APP_TENANT_CLAIM`, Keycloak's

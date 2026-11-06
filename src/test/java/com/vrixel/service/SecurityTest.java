@@ -64,7 +64,7 @@ class SecurityTest {
                         .with(jwt().authorities(write)))
                 .andExpect(status().isForbidden());
         mvc.perform(put("/api/v1/greetings/g-1").contentType(MediaType.APPLICATION_JSON).content(BODY)
-                        .with(jwt().jwt(j -> j.claim("tenant", "clinic-1")).authorities(write)))
+                        .with(jwt().jwt(j -> j.claim("organization", "clinic-1")).authorities(write)))
                 .andExpect(status().isAccepted());
     }
 

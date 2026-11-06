@@ -56,7 +56,7 @@ app:
     # to start rather than run unauthenticated or accept tokens issued for anything else.
     issuer: ${APP_ISSUER:}                     # https://id.<domain>/realms/<product>
     audience: ${APP_AUDIENCE:}                 # the product's API audience, e.g. emr-api
-    tenant-claim: ${APP_TENANT_CLAIM:tenant}   # the token claim naming the caller's tenant (Keycloak: organization)
+    tenant-claim: ${APP_TENANT_CLAIM:organization}   # the token claim naming the caller's tenant (Keycloak organizations)
   # Audit trail (com.vrixel.service.audit): kafka in deployed environments, log locally.
   audit:
     sink: ${AUDIT_SINK:log}

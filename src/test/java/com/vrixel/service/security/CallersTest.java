@@ -64,6 +64,10 @@ class CallersTest {
         assertThat(new KeycloakAuthorities().convert(token)).extracting(GrantedAuthority::getAuthority)
                 .containsExactlyInAnyOrder("SCOPE_greetings:read", "SCOPE_greetings:write", "ROLE_clinician");
         assertThat(new KeycloakAuthorities().convert(jwt(Map.of()))).isEmpty();
+        // The app asked for write, but the person holds only read: write is dropped.
+        Jwt member = jwt(Map.of("scope", "openid greetings:read greetings:write", "permissions", List.of("greetings:read")));
+        assertThat(new KeycloakAuthorities().convert(member)).extracting(GrantedAuthority::getAuthority)
+                .containsExactlyInAnyOrder("SCOPE_openid", "SCOPE_greetings:read");
     }
 
     @Test
