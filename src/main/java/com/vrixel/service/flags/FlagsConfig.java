@@ -31,6 +31,17 @@ public class FlagsConfig {
         return api.getClient();
     }
 
+    /** Users with each feature on against off, logged once a minute for the SDLC tool's gradual releases. */
+    @Bean(destroyMethod = "close")
+    FlagCohorts flagCohorts() {
+        return FlagCohorts.reporting();
+    }
+
+    @Bean
+    FlagCohortFilter flagCohortFilter(FlagCohorts cohorts) {
+        return new FlagCohortFilter(cohorts);
+    }
+
     static FeatureProvider provider(FlagsProperties props) {
         if (props.url().isEmpty()) {
             return null;
