@@ -26,9 +26,15 @@ public class Flags {
         this.client = client;
     }
 
-    /** Whether the feature is on for this caller (their user id, for percentage rollouts). */
+    /**
+     * Whether the feature is on for this caller (their user id: a gradual release turns it on for a
+     * share of users, and each keeps the same answer). The request counts toward the flag's on or
+     * off side ({@link FlagCohorts}).
+     */
     public boolean enabled(String key, String user) {
-        return Boolean.TRUE.equals(client.getBooleanValue(key, false, new ImmutableContext(user == null ? "" : user)));
+        boolean on = Boolean.TRUE.equals(client.getBooleanValue(key, false, new ImmutableContext(user == null ? "" : user)));
+        FlagCohorts.seen(key, on);
+        return on;
     }
 
     public boolean enabled(String key) {
