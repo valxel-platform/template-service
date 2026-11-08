@@ -146,14 +146,17 @@ incident.
 With `SENTRY_DSN` set, unhandled exceptions and `ERROR` logs go to Sentry (Spring Boot integration
 and Logback appender), grouped into issues; Sentry's issue alerts reach the SDLC tool as incident
 signals. `ErrorReports` keeps the exception type, stack, endpoint path and method, the log message's
-pattern and a `trace_id` tag, and removes exception messages, formatted messages and arguments,
+pattern, a `trace_id` tag and a `component` tag (`spring.application.name`, so the SDLC tool routes
+the issue to this component), and removes exception messages, formatted messages and arguments,
 query strings, headers, bodies, users and breadcrumbs. Unset, Sentry is off. Also `ENVIRONMENT`
 and `SENTRY_RELEASE` (the image tag). For PHI products use a Sentry plan under a BAA, or self-hosted
 Sentry. Logs, traces and metrics stay in OpenChoreo.
 
 ## After creating a repo from this template
 
-1. Rename the package (`com.vrixel.service`), `rootProject.name` and the Pact provider name.
+1. Rename the package (`com.vrixel.service`) and the Pact provider name. The SDLC tool has already
+   put the component's name in the files `.vrixel/identity` lists (`rootProject.name`,
+   `spring.application.name`, the Workload, CI); a repo created by hand needs them renamed.
 2. Replace the greeting example with your first endpoint, test first.
 3. Point `PactProviderTest` at your consumers' pacts (`@PactBroker` once you run a broker).
 4. Products that handle PHI or payments keep data out of logs and fixtures: see `SECURITY.md`.
