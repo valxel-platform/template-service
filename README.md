@@ -32,9 +32,33 @@ Everything below is wired to the platform's gates, so a new repo is deliverable 
 | `dependency-review` | `ci.yml` | no | the `dependencies` suite reads GitHub's dependency diff |
 | `image` | `ci.yml` | no | proves the Dockerfile builds; OpenChoreo builds the shipped image |
 | `integration / report`, `e2e / report`, `smoke / report` | `post-deploy.yml` | per stage | the `integration`, `e2e` and `smoke` suites |
+| `perf-smoke / report` | `perf.yml` | when the change needs it | the `perf-smoke` suite: this PR's image against main's |
+| `performance / report` | `post-deploy.yml` (staging) | when the change needs it | the `performance` suite: the staging load test |
 
 `post-deploy.yml` runs when the pipeline sends a `vrixel-deployed` repository dispatch after a
 deployment is ready (or by hand with **Run workflow**).
+
+## Performance tests
+
+The Vrixel SDLC decides per change whether this repo needs a performance test: a hot path, a
+migration, an upgrade or settings change gets the **smoke** test; an API contract change or a
+design that adds traffic gets the **staging load test** as well. It labels the pull request
+(`vrixel:perf-smoke`, `vrixel:perf-full`) and opens the report as pending; the workflows answer.
+
+- **Smoke** (`perf.yml`, `perf/smoke.js`): the image built from main and the PR's image, side by
+  side on one runner, 30 requests a second for a minute after a warm-up. Fails when the PR is more
+  than 20% slower than main at the 95th or 99th percentile, its error rate rises, or it misses the
+  budget.
+- **Staging load** (`post-deploy.yml`, `perf/load.js`): the product's expected peak scaled to
+  staging (`peak_rps` x `staging_load_factor`, 10% by default) for three minutes, reads and writes
+  mixed, with `API_TOKEN`'s test identity and synthetic records. Judged against the budget and the
+  last passing run, which the job keeps on the `perf-baselines` branch.
+- **Budgets**: 500 ms at the 95th percentile, 1 s at the 99th, under 1% errors, unless the
+  product's `performance:` settings say otherwise. `perf/compare.py` judges, and writes a table to
+  the run's summary.
+
+Replace the requests in `perf/*.js` with your API's hot paths as it grows. Run locally with
+`docker run --rm --network host -v $PWD/perf:/perf grafana/k6:2.3.0 run /perf/smoke.js`.
 
 ## Develop
 

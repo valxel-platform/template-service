@@ -1,0 +1,58 @@
+# Performance smoke test, on pull requests the Vrixel SDLC labels vrixel:perf-smoke or
+# vrixel:perf-full (a hot path, a migration, an upgrade, a contract change...). The image built from
+# main and the PR's image run side by side on this runner under the same load (perf/smoke.js);
+# perf/compare.py posts "perf-smoke / report": failed when the PR is more than 20% slower than main
+# or over the budget. Shared runners are noisy, so this compares, it doesn't measure absolutes.
+name: perf
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  perf-smoke:
+    name: perf-smoke
+    if: contains(github.event.pull_request.labels.*.name, 'vrixel:perf-smoke') || contains(github.event.pull_request.labels.*.name, 'vrixel:perf-full')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      statuses: write
+    env:
+      K6: grafana/k6:2.3.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: pr
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: main
+          persist-credentials: false
+      - name: Build both images
+        run: |
+          docker build -q -t svc:main main
+          docker build -q -t svc:pr pr
+      - name: Load main, then the PR, the same way
+        run: |
+          mkdir -p out
+          for v in main pr; do
+            docker rm -f svc >/dev/null 2>&1 || true
+            docker run -d --name svc -p 8080:8080 -p 8081:8081 -e APP_SECURITY_ENABLED=false svc:$v
+            for i in $(seq 1 60); do curl -fs http://127.0.0.1:8081/actuator/health/readiness >/dev/null && break; sleep 1; done
+            docker run --rm --network host --user "$(id -u)" -v "$PWD/pr/perf:/perf:ro" -v "$PWD/out:/out" \
+              -e BASE_URL=http://127.0.0.1:8080 -e SUMMARY=/out/$v.json $K6 run --quiet /perf/smoke.js
+          done
+      - name: Judge and report
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPORT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 pr/perf/compare.py --kind api --run out/pr.json --reference out/main.json --regression 20 --context "perf-smoke / report"

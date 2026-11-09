@@ -1,6 +1,7 @@
 # Runs after the Vrixel SDLC deploys a commit: integration in dev, end-to-end in staging, smoke in
 # production. Results are posted on the deployed commit as "integration / report", "e2e / report"
-# and "smoke / report", which the pipeline's quality gates read.
+# and "smoke / report", which the pipeline's quality gates read. In staging, when the change needs
+# it (performance: full), the load test too: "performance / report".
 name: post-deploy
 
 on:
@@ -57,3 +58,42 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python3 .github/scripts/report.py --context "${{ steps.run.outputs.suite }} / report" --junit 'build/test-results/deployedTest/*.xml'
+
+  # The staging load test, when the Vrixel SDLC says the change needs one: the product's expected
+  # peak scaled to staging (peak_rps x load_factor), judged against the budget and the last passing
+  # run (kept on the perf-baselines branch; a pass becomes the next baseline).
+  performance:
+    name: performance
+    if: (github.event.client_payload.stage || inputs.stage) == 'staging' && github.event.client_payload.performance == 'full'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write     # the perf-baselines branch
+      statuses: write
+    env:
+      BASE_URL: ${{ github.event.client_payload.base_url }}
+      API_TOKEN: ${{ secrets.API_TOKEN }}
+      REPORT_SHA: ${{ github.event.client_payload.sha }}
+      SETTINGS: ${{ toJSON(github.event.client_payload.perf_settings) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.REPORT_SHA }}
+          persist-credentials: false
+      - name: Load staging at the scaled peak
+        run: |
+          rps=$(python3 -c 'import json,os; s=json.loads(os.environ["SETTINGS"] or "{}") or {}; print(max(1, round((s.get("peak_rps") or 50) * (s.get("load_factor") or 0.1))))')
+          echo "Target: $rps requests per second"
+          mkdir -p out
+          docker run --rm --network host --user "$(id -u)" -v "$PWD/perf:/perf:ro" -v "$PWD/out:/out" \
+            -e BASE_URL -e API_TOKEN -e TARGET_RPS=$rps -e SUMMARY=/out/staging.json grafana/k6:2.3.0 run --quiet /perf/load.js
+      - name: Judge and report
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          budget=$(python3 -c 'import json,os; s=json.loads(os.environ["SETTINGS"] or "{}") or {}; print(json.dumps((s.get("budgets") or {}).get("api") or {}))')
+          pct=$(python3 -c 'import json,os; s=json.loads(os.environ["SETTINGS"] or "{}") or {}; print(s.get("regression_pct") or 10)')
+          python3 perf/compare.py --kind api --run out/staging.json --budget "$budget" --regression "$pct" \
+            --baseline staging.json --save-baseline staging.json --context "performance / report"
+
