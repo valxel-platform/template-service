@@ -10,7 +10,7 @@ COPY src src
 RUN ./gradlew --no-daemon bootJar -x test \
  && java -Djarmode=tools -jar build/libs/app.jar extract --layers --destination /extracted
 
-FROM gcr.io/distroless/java21-debian12:nonroot
+FROM gcr.io/distroless/java21-debian13:nonroot
 # /app belongs to the non-root user, so the training run below can write its class archive there.
 COPY --chown=nonroot:nonroot --from=build /extracted/dependencies/ /app/
 COPY --chown=nonroot:nonroot --from=build /extracted/spring-boot-loader/ /app/
