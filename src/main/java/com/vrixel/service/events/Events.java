@@ -74,7 +74,9 @@ public class Events {
         headers.put("ce_subject", subject);
         String[] trace = traceIds.get();
         if (!trace[0].isBlank() && !trace[1].isBlank()) {
-            headers.put("traceparent", "00-" + trace[0] + "-" + trace[1] + "-01");
+            // The trace's own sampling decision travels on, so workers keep or drop it the same way.
+            String flags = trace.length > 2 && "0".equals(trace[2]) ? "00" : "01";
+            headers.put("traceparent", "00-" + trace[0] + "-" + trace[1] + "-" + flags);
         }
         EventSink.Position at;
         try {

@@ -96,7 +96,9 @@ if (flags.enabled("emr.emr-feat-3.check-in-kiosk", user)) {
 `com.vrixel.service.flags` reads flags over OFREP from the product's Flipt. Set per environment:
 `FLAGS_URL` (e.g. `http://flipt.emr.svc:8080`), `FLAGS_ENVIRONMENT` (e.g. `production`),
 `FLAGS_NAMESPACE` (e.g. `emr`) and, if the product's Flipt requires it for evaluation,
-`FLAGS_TOKEN`. Without `FLAGS_URL`, or when Flipt can't be reached, every flag reads as off. Tests
+`FLAGS_TOKEN`. Without `FLAGS_URL`, or when Flipt can't be reached, every flag reads as off. Each
+answer is reused for `FLAGS_CACHE_SECONDS` (30) per flag and user, and a call to Flipt waits at most
+250 ms, so most requests don't call Flipt and a slow Flipt never slows a request by more. Tests
 set flags with OpenFeature's `InMemoryProvider` (see `FlagsTest`).
 
 ## Changing state: Kafka first
@@ -112,8 +114,9 @@ return ResponseEntity.accepted().body(Accepted.of(p.eventId()));
 
 - Topic `<prefix>.<entity>.v1` (`EVENTS_TOPIC_PREFIX`, e.g. `emr.intake-api`), keyed by the record's
   id so its changes stay in order; type `vrixel.<entity>.<what happened>.v1`.
-- Kafka doesn't confirm in time (`EVENTS_TIMEOUT_MS`): 503, nothing changed. Retries with the same
-  `Idempotency-Key` get the same event id, so workers apply them once.
+- Kafka doesn't confirm in time (`EVENTS_TIMEOUT_MS`): 503, nothing changed, and a `failure` audit
+  record follows the change's record. Retries with the same `Idempotency-Key` from the same caller
+  and tenant get the same event id, so workers apply them once; another caller's key never matches.
 - The data stores (Postgres, a search index, a cache) are kept by event workers, from
   `vrixel-tools/template-event-worker`, and can be rebuilt by replaying the topic. Reads come from
   them, so a change shows up once a worker has applied it, usually within a second.
@@ -133,6 +136,16 @@ auditor.record("patient.read", Actor.user(jwt.getSubject()), "patient", List.of(
 Records hold ids, never field values. Settings: `AUDIT_SINK` (`kafka` in deployed environments,
 `log` locally), `AUDIT_KAFKA_BOOTSTRAP`, `AUDIT_TOPIC`, `AUDIT_REQUIRED` (default `true`),
 `PRODUCT`, `ENVIRONMENT`, `DATA_CLASS`; extra Kafka client settings go under `app.audit.kafka`.
+
+- **Refusals are on record.** A missing or invalid token (401) is recorded as `access.unauthenticated`
+  and a missing permission or a record-level refusal (403) as `access.denied`, with the endpoint
+  (ids masked) and outcome `denied`. These are sent without waiting, so a flood of bad requests
+  can't slow the service down through the audit trail.
+- **Required or not.** `AUDIT_REQUIRED=true` (the default, and the rule for `phi` and `payments`)
+  waits for Kafka on every record and fails the request if it can't be kept. A `general` product may
+  set it to `false`: records are then sent without waiting and batched, so reads don't wait on Kafka.
+- **Encrypted.** A `phi` or `payments` product refuses to start unless `security.protocol` is `SSL`
+  or `SASL_SSL`, for audit and events alike.
 
 Traces export when `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT` points at the data
 plane's collector (e.g. `http://otel-collector:4318/v1/traces`); incoming `traceparent` headers

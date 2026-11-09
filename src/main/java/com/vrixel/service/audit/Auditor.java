@@ -37,6 +37,31 @@ public class Auditor {
         this.traceIds = traceIds;
     }
 
+    /**
+     * A record nobody's request waits for: refused calls (401, 403) and the failure that follows a
+     * change that didn't happen. Never throws and never blocks the response; a flood of refused
+     * calls can't slow the service down through the audit trail.
+     */
+    public void recordQuietly(String action, Actor actor, String outcome, String reason, Map<String, ?> details) {
+        recordQuietly(action, actor, "", List.of(), outcome, reason, details);
+    }
+
+    public void recordQuietly(
+            String action,
+            Actor actor,
+            String resourceType,
+            Collection<String> ids,
+            String outcome,
+            String reason,
+            Map<String, ?> details) {
+        try {
+            Map<String, Object> event = build(action, actor, resourceType, ids, outcome, reason, "", details);
+            sink.publishAsync(String.valueOf(event.get("subject")), Json.write(event));
+        } catch (RuntimeException e) {
+            log.error("audit record dropped ({}): {}", e.getClass().getSimpleName(), action);
+        }
+    }
+
     public Map<String, Object> record(String action, Actor actor, String resourceType, Collection<String> ids) {
         return record(action, actor, resourceType, ids, "success", "", "", Map.of());
     }
@@ -46,6 +71,31 @@ public class Auditor {
      * counts, codes and ids, never field values.
      */
     public Map<String, Object> record(
+            String action,
+            Actor actor,
+            String resourceType,
+            Collection<String> ids,
+            String outcome,
+            String reason,
+            String onBehalfOf,
+            Map<String, ?> details) {
+        Map<String, Object> event = build(action, actor, resourceType, ids, outcome, reason, onBehalfOf, details);
+        String subject = String.valueOf(event.get("subject"));
+        if (!props.isRequired()) { // the product chose not to wait for the audit trail (general data)
+            sink.publishAsync(subject, Json.write(event));
+            return event;
+        }
+        try {
+            sink.publish(subject, Json.write(event));
+        } catch (RuntimeException e) {
+            throw e instanceof AuditUnavailableException a
+                    ? a
+                    : new AuditUnavailableException("audit record could not be published", e);
+        }
+        return event;
+    }
+
+    private Map<String, Object> build(
             String action,
             Actor actor,
             String resourceType,
@@ -91,17 +141,6 @@ public class Auditor {
         event.put("subject", subject);
         event.put("datacontenttype", "application/json");
         event.put("data", data);
-
-        try {
-            sink.publish(subject, Json.write(event));
-        } catch (RuntimeException e) {
-            if (props.isRequired()) {
-                throw e instanceof AuditUnavailableException a
-                        ? a
-                        : new AuditUnavailableException("audit record could not be published", e);
-            }
-            log.error("audit record dropped ({}): {} {}", e.getClass().getSimpleName(), action, subject);
-        }
         return event;
     }
 }

@@ -18,6 +18,7 @@ repositories { mavenCentral() }
 dependencies {
     implementation(platform(SpringBootPlugin.BOM_COORDINATES))
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    implementation("org.springframework.boot:spring-boot-starter-restclient") // traced, timed outbound calls
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-security")
@@ -36,6 +37,18 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation(libs.pact.provider.junit5)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // kafka-clients brings lz4-java; versions before 1.11.4 have a high advisory.
+    constraints {
+        implementation("at.yawk.lz4:lz4-java") {
+            version { require("[1.11.4,2.0)") }
+            because("CVE-2026-106451 (GHSA-mcr4-qmvw-px4g), through kafka-clients")
+        }
+        implementation("org.xerial.snappy:snappy-java") {
+            version { require("[1.1.10.9,2.0)") }
+            because("GHSA-q233-g92q-qxp6, GHSA-gwq9-9ffj-mvrv, through kafka-clients")
+        }
+    }
 }
 
 tasks.withType<JavaCompile>().configureEach {
