@@ -56,7 +56,7 @@ class FlagCohortsTest {
         filter.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(), (req, res) -> { });
 
         assertThat(cohorts.drain()).containsExactly(FlagCohorts.MARKER + " {\"flag\":\"" + KEY
-                + "\",\"on\":{\"requests\":2,\"errors\":1},\"off\":{\"requests\":1,\"errors\":1}}");
+                + "\",\"on\":{\"requests\":2,\"errors\":1,\"slow\":0},\"off\":{\"requests\":1,\"errors\":1,\"slow\":0}}");
         assertThat(cohorts.drain()).isEmpty(); // counts start again
     }
 
@@ -77,5 +77,20 @@ class FlagCohortsTest {
         flags(true).enabled(KEY, "batch");
         cohorts.end(false);
         assertThat(cohorts.drain()).isEmpty();
+    }
+
+    @Test
+    void aSlowRequestCountsAsSlowOnItsSide() {
+        FlagCohorts cohorts = new FlagCohorts();
+        FlagCohorts.begin();
+        FlagCohorts.seen(KEY, true);
+        cohorts.end(false, FlagCohorts.SLOW_MS + 1);
+        FlagCohorts.begin();
+        FlagCohorts.seen(KEY, false);
+        cohorts.end(false, 1);
+        assertThat(cohorts.drain()).containsExactly(FlagCohorts.MARKER + " {\"flag\":\"" + KEY
+                + "\",\"on\":{\"requests\":1,\"errors\":0,\"slow\":1},\"off\":{\"requests\":1,\"errors\":0,\"slow\":0}}");
+        assertThat(FlagCohorts.slowMillis("250")).isEqualTo(250);
+        assertThat(FlagCohorts.slowMillis("nope")).isEqualTo(FlagCohorts.slowMillis(null));
     }
 }
