@@ -77,11 +77,16 @@ app:
     sink: ${AUDIT_SINK:log}
     bootstrap: ${AUDIT_KAFKA_BOOTSTRAP:}
     topic: ${AUDIT_TOPIC:audit.v1}
-    required: ${AUDIT_REQUIRED:true}     # a request whose audit record can't be published fails (503)
+    # true: a request whose audit record can't be published fails (503); required for phi and
+    # payments. false (general data only): records are sent without waiting, batched, and a Kafka
+    # outage drops records (logged) instead of failing requests.
+    required: ${AUDIT_REQUIRED:true}
     product: ${PRODUCT:}
     environment: ${ENVIRONMENT:}
     data-class: ${DATA_CLASS:general}    # general | phi | payments
     # kafka: { security.protocol: SASL_SSL, sasl.mechanism: SCRAM-SHA-512, sasl.jaas.config: ... }
+    # phi and payments products must set security.protocol to SSL or SASL_SSL, or the service
+    # refuses to start (audit and events alike).
   # Domain events (com.vrixel.service.events): every change is published to Kafka first, and the
   # event workers keep the data stores up to date. kafka in deployed environments, log locally.
   events:
@@ -97,3 +102,4 @@ app:
     environment: ${FLAGS_ENVIRONMENT:}   # e.g. production
     namespace: ${FLAGS_NAMESPACE:}       # e.g. emr
     token: ${FLAGS_TOKEN:}               # only if the product's Flipt requires one for evaluation
+    cache-seconds: ${FLAGS_CACHE_SECONDS:30}   # each answer is reused this long, per flag and user

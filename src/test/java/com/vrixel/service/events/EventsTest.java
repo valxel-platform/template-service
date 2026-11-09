@@ -53,6 +53,22 @@ class EventsTest {
     }
 
     @Test
+    void anUnsampledTraceStaysUnsampled() {
+        EventsProperties props = new EventsProperties(null, null, null, null, null, null);
+        Events unsampled = new Events(sink, props, "svc", Clock.systemUTC(),
+                () -> new String[] {"a".repeat(32), "b".repeat(16), "0"});
+        unsampled.publish("orders", "placed", "o-1", Map.of(), null);
+        assertThat(sink.sent.getFirst().headers()).containsEntry("traceparent", "00-" + "a".repeat(32) + "-" + "b".repeat(16) + "-00");
+    }
+
+    @Test
+    void phiEventsNeverTravelInPlainText() {
+        assertThatThrownBy(() -> EventsConfig.sink(
+                        new EventsProperties("kafka", "127.0.0.1:9", null, null, null, null), "svc", "phi"))
+                .hasMessageContaining("must use TLS");
+    }
+
+    @Test
     void aChangeKafkaDoesntConfirmDidNotHappen() {
         sink.fail = true;
         assertThatThrownBy(() -> events.publish("patients", "registered", "p-1", Map.of(), null))

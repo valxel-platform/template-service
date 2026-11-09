@@ -103,6 +103,34 @@ class AuditorTest {
         assertThat(AuditConfig.traceIds(Tracer.NOOP)).hasSize(2);
     }
 
+    @Test
+    void phiAndPaymentsNeverTalkToKafkaInPlainText() {
+        AuditProperties phi = new AuditProperties("kafka", "127.0.0.1:9", "t", true, 200, "", "", "phi", Map.of());
+        assertThatThrownBy(() -> AuditConfig.sink(phi)).hasMessageContaining("must use TLS");
+        AuditProperties pay = new AuditProperties(
+                "kafka", "127.0.0.1:9", "t", true, 200, "", "", "payments", Map.of("security.protocol", "sasl_plaintext"));
+        assertThatThrownBy(() -> AuditConfig.sink(pay)).hasMessageContaining("SASL_PLAINTEXT");
+        AuditConfig.requireEncryption(Map.of("security.protocol", "SASL_SSL"), "phi", "audit");
+        AuditConfig.requireEncryption(Map.of(), "general", "audit");
+    }
+
+    @Test
+    void refusalsAndOptionalRecordsNeverThrow() {
+        RecordingSink sink = new RecordingSink();
+        sink.fail = true;
+        RecordingSink.auditor(sink, true).recordQuietly("access.denied", Actor.user("u"), "denied", "no", Map.of());
+        RecordingSink.auditor(sink, false).record("greeting.read", Actor.user("u"), "greeting", List.of());
+        sink.fail = false;
+        RecordingSink.auditor(sink, true).recordQuietly("access.denied", Actor.user("u"), "denied", "no",
+                Map.of("endpoint", "/api/v1/greetings"));
+        assertThat(sink.events.getFirst().read("$.data.outcome", String.class)).isEqualTo("denied");
+    }
+
+    @Test
+    void theSamplingDecisionTravelsWithTheTrace() {
+        assertThat(AuditConfig.traceContext(null)).containsExactly("", "", "");
+    }
+
     private static AuditProperties props(String sink, String bootstrap) {
         return new AuditProperties(sink, bootstrap, "t", true, 200, "", "", "", Map.of());
     }

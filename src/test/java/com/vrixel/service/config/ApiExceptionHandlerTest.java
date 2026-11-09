@@ -11,8 +11,16 @@ class ApiExceptionHandlerTest {
     @Test
     void turnsRuleViolationsIntoBadRequests() {
         ProblemDetail problem = new ApiExceptionHandler()
-                .badRequest(new IllegalArgumentException("name must not be blank"));
+                .badRequest(new InvalidRequestException("name must not be blank"));
         assertThat(problem.getStatus()).isEqualTo(400);
         assertThat(problem.getDetail()).isEqualTo("name must not be blank");
+    }
+
+    @Test
+    void otherBadArgumentsNeverEchoTheirMessage() {
+        ProblemDetail problem = new ApiExceptionHandler()
+                .badRequest(new IllegalArgumentException("Invalid date 1984-03-02 for Ana Lopez"));
+        assertThat(problem.getStatus()).isEqualTo(400);
+        assertThat(problem.getDetail()).isEqualTo("The request is not valid.");
     }
 }

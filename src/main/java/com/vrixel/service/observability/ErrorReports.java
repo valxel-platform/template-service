@@ -35,7 +35,7 @@ public class ErrorReports implements SentryOptions.BeforeSendCallback {
         if (request != null) {
             Request kept = new Request();
             kept.setMethod(request.getMethod());
-            kept.setUrl(pathOnly(request.getUrl()));
+            kept.setUrl(Paths.withoutIds(pathOnly(request.getUrl()))); // ids in paths can identify people
             event.setRequest(kept);
         }
         if (event.getExceptions() != null) {

@@ -1,5 +1,6 @@
 package com.vrixel.service.greeting;
 
+import com.vrixel.service.config.InvalidRequestException;
 import org.springframework.stereotype.Service;
 
 /** Business logic lives in services, free of HTTP concerns, so it is cheap to unit test. */
@@ -12,10 +13,10 @@ public class GreetingService {
     public Greeting greet(String name) {
         String trimmed = name.strip();
         if (trimmed.isEmpty()) {
-            throw new IllegalArgumentException("name must not be blank");
+            throw new InvalidRequestException("name must not be blank");
         }
         if (trimmed.length() > MAX_NAME) {
-            throw new IllegalArgumentException("name must be at most " + MAX_NAME + " characters");
+            throw new InvalidRequestException("name must be at most " + MAX_NAME + " characters");
         }
         return new Greeting("Hello, " + trimmed + "!");
     }
@@ -25,10 +26,10 @@ public class GreetingService {
         greet(command.name());
         String message = command.message() == null ? "" : command.message().strip();
         if (message.isEmpty()) {
-            throw new IllegalArgumentException("message must not be blank");
+            throw new InvalidRequestException("message must not be blank");
         }
         if (message.length() > MAX_MESSAGE) {
-            throw new IllegalArgumentException("message must be at most " + MAX_MESSAGE + " characters");
+            throw new InvalidRequestException("message must be at most " + MAX_MESSAGE + " characters");
         }
         return message;
     }

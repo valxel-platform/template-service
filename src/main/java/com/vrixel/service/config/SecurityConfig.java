@@ -1,5 +1,8 @@
 package com.vrixel.service.config;
 
+import com.vrixel.service.audit.Actor;
+import com.vrixel.service.audit.Auditor;
+import com.vrixel.service.observability.Paths;
 import com.vrixel.service.security.AccessPolicy;
 import com.vrixel.service.security.Callers;
 import com.vrixel.service.security.KeycloakAuthorities;
@@ -11,6 +14,12 @@ import java.net.http.HttpClient;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.Map;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
+import org.springframework.security.oauth2.server.resource.web.access.BearerTokenAccessDeniedHandler;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -43,15 +52,35 @@ public class SecurityConfig {
 
     @Bean
     @ConditionalOnProperty(name = "app.security.enabled", havingValue = "true", matchIfMissing = true)
-    SecurityFilterChain api(HttpSecurity http) throws Exception {
+    SecurityFilterChain api(HttpSecurity http, Auditor auditor, Callers callers) throws Exception {
         JwtAuthenticationConverter tokens = new JwtAuthenticationConverter();
         tokens.setJwtGrantedAuthoritiesConverter(new KeycloakAuthorities());
+        // Refusals are on record (outcome denied) without waiting for the audit trail: a missing or
+        // invalid token (401), and a token without the permission an URL needs (403).
+        AuthenticationEntryPoint bearer = new BearerTokenAuthenticationEntryPoint();
+        AuthenticationEntryPoint unauthenticated = (request, response, ex) -> {
+            auditor.recordQuietly("access.unauthenticated", Actor.user("anonymous"), "denied",
+                    ex.getClass().getSimpleName(), Map.of("method", request.getMethod(),
+                            "endpoint", Paths.withoutIds(request.getRequestURI())));
+            bearer.commence(request, response, ex);
+        };
+        AccessDeniedHandler bearerDenied = new BearerTokenAccessDeniedHandler();
+        AccessDeniedHandler denied = (request, response, ex) -> {
+            auditor.recordQuietly("access.denied", callers.actor(SecurityContextHolder.getContext().getAuthentication()),
+                    "denied", "not permitted", Map.of("method", request.getMethod(),
+                            "endpoint", Paths.withoutIds(request.getRequestURI())));
+            bearerDenied.handle(request, response, ex);
+        };
         return http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers("/api/**").authenticated() // then each endpoint's @PreAuthorize
                         .anyRequest().denyAll())
-                .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(tokens)))
+                .oauth2ResourceServer(oauth -> oauth
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(tokens))
+                        .authenticationEntryPoint(unauthenticated)
+                        .accessDeniedHandler(denied))
+                .exceptionHandling(e -> e.authenticationEntryPoint(unauthenticated).accessDeniedHandler(denied))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(csrf -> csrf.disable()) // stateless bearer-token API: no cookies to protect
                 .build();

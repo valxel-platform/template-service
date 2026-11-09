@@ -40,7 +40,8 @@ public class KafkaAuditSink implements AuditSink, AutoCloseable {
         config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, (int) timeout.toMillis());
         config.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, (int) timeout.toMillis());
         config.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, (int) Math.min(timeout.toMillis(), 30_000));
-        config.put(ProducerConfig.LINGER_MS_CONFIG, 0);
+        // Waited-for records go out at once; records sent without waiting batch for a few ms.
+        config.put(ProducerConfig.LINGER_MS_CONFIG, 5);
         config.putAll(extra);
         return new KafkaAuditSink(
                 new KafkaProducer<>(config, new StringSerializer(), new ByteArraySerializer()), topic, timeout);
@@ -59,6 +60,23 @@ public class KafkaAuditSink implements AuditSink, AutoCloseable {
             throw new AuditUnavailableException("audit record not acknowledged by Kafka", e);
         }
     }
+
+    @Override
+    public void publishAsync(String key, String json) {
+        ProducerRecord<String, byte[]> record = new ProducerRecord<>(topic, key, json.getBytes(StandardCharsets.UTF_8));
+        record.headers().add("ce_type", Auditor.EVENT_TYPE.getBytes(StandardCharsets.UTF_8));
+        try {
+            producer.send(record, (meta, error) -> {
+                if (error != null) {
+                    LOG.error("audit record dropped ({}): {}", error.getClass().getSimpleName(), key);
+                }
+            });
+        } catch (RuntimeException e) { // the buffer is full or the producer is closed
+            LOG.error("audit record dropped ({}): {}", e.getClass().getSimpleName(), key);
+        }
+    }
+
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("audit");
 
     @Override
     public void close() {

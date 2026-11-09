@@ -6,6 +6,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.Mockito.verify;
+
+import com.vrixel.service.audit.AuditSink;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +33,9 @@ class SecurityTest {
     @MockitoBean
     JwtDecoder jwtDecoder;
 
+    @MockitoBean
+    AuditSink auditSink;
+
     @Autowired
     WebApplicationContext context;
 
@@ -38,6 +46,15 @@ class SecurityTest {
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    }
+
+    @Test
+    void refusalsAreOnRecordWithoutWaiting() throws Exception {
+        mvc.perform(get("/api/v1/greetings").param("name", "Ada")).andExpect(status().isUnauthorized());
+        verify(auditSink).publishAsync(anyString(), contains("\"action\":\"access.unauthenticated\""));
+        mvc.perform(get("/api/v1/greetings").param("name", "Ada").with(jwt())).andExpect(status().isForbidden());
+        verify(auditSink).publishAsync(anyString(), contains("\"action\":\"access.denied\""));
+        verify(auditSink).publishAsync(anyString(), contains("/api/v1/greetings"));
     }
 
     @Test

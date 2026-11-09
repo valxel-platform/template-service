@@ -82,6 +82,9 @@ public class GreetingController {
         String tenant = callers.tenant(caller);
         access.require(caller, new Resource("greeting", id, tenant), Action.WRITE);
         Actor actor = callers.actor(caller);
+        // No change without a record: the record goes first and the request fails if it can't be
+        // kept. If the event then can't be published, a failure record follows (same trace id), so
+        // the trail never shows a change that didn't happen.
         auditor.record("greeting.save", actor, "greeting", List.of(id));
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("id", id);
@@ -89,7 +92,18 @@ public class GreetingController {
         data.put("name", body.name().strip());
         data.put("message", message);
         data.put("saved_by", actor.id());
-        Events.Published published = events.publish("greetings", "saved", id, data, idempotencyKey);
+        // Retries are recognized per tenant and caller: another caller's key never matches this one.
+        String key = idempotencyKey == null || idempotencyKey.isBlank()
+                ? null
+                : (tenant == null ? "" : tenant) + "\n" + actor.id() + "\n" + idempotencyKey;
+        Events.Published published;
+        try {
+            published = events.publish("greetings", "saved", id, data, key);
+        } catch (RuntimeException e) {
+            auditor.recordQuietly("greeting.save", actor, "greeting", List.of(id), "failure",
+                    "the change could not be recorded; nothing changed", Map.of());
+            throw e;
+        }
         return ResponseEntity.accepted().body(Accepted.of(published.eventId()));
     }
 }
