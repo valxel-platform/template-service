@@ -1,5 +1,5 @@
-# Performance smoke test, on pull requests the Vrixel SDLC labels vrixel:perf-smoke or
-# vrixel:perf-full (a hot path, a migration, an upgrade, a contract change...). The image built from
+# Performance smoke test, on pull requests the Valxel SDLC labels valxel:perf-smoke or
+# valxel:perf-full (a hot path, a migration, an upgrade, a contract change...). The image built from
 # main and the PR's image run side by side on this runner under the same load (perf/smoke.js);
 # perf/compare.py posts "perf-smoke / report": failed when the PR is more than 20% slower than main
 # or over the budget. Shared runners are noisy, so this compares, it doesn't measure absolutes.
@@ -19,7 +19,7 @@ concurrency:
 jobs:
   perf-smoke:
     name: perf-smoke
-    if: contains(github.event.pull_request.labels.*.name, 'vrixel:perf-smoke') || contains(github.event.pull_request.labels.*.name, 'vrixel:perf-full')
+    if: contains(github.event.pull_request.labels.*.name, 'valxel:perf-smoke') || contains(github.event.pull_request.labels.*.name, 'valxel:perf-full')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

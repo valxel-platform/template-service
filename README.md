@@ -1,6 +1,6 @@
 # Service template (Java 21, Spring Boot 4)
 
-The golden path for Vrixel API services. The Vrixel SDLC creates product repos from this template
+The golden path for Valxel API services. The Valxel SDLC creates product repos from this template
 when an approved design needs a new service; you can also use **Use this template** on GitHub.
 Everything below is wired to the platform's gates, so a new repo is deliverable from its first PR.
 
@@ -17,15 +17,15 @@ Everything below is wired to the platform's gates, so a new repo is deliverable 
 | Deployed checks | `DeployedSmokeTest` (tag `deployed`) against `BASE_URL` | Integration in dev, end-to-end in staging, smoke in production |
 | Feature flags | OpenFeature with an OFREP provider for the product's Flipt (`FLAGS_URL`); `Flags.enabled(key, user)` | New behavior ships dark; the SDLC tool creates the flag and turns it on at release |
 | Observability | Actuator liveness and readiness, Prometheus metrics, ECS JSON logs with trace ids, OpenTelemetry traces (`spring-boot-starter-opentelemetry`) exported to the data plane's collector | Platform probes and dashboards work without extra setup; one request can be followed across services |
-| Product events | `ProductEvents.record("checkin_completed")`: a counter (`vrixel.events`), a summary line a minute and per-flag counts | The SDLC tool proves in staging that a feature's goal events fire, reads goals from them after release, and compares users with the feature on against off |
+| Product events | `ProductEvents.record("checkin_completed")`: a counter (`valxel.events`), a summary line a minute and per-flag counts | The SDLC tool proves in staging that a feature's goal events fire, reads goals from them after release, and compares users with the feature on against off |
 | Events | Commands publish one CloudEvent to Kafka (`Events.publish`) and answer 202; event workers keep the data stores up to date. Kafka down means 503 and no change | No dual writes (VX-16): Kafka is the record, and every database can be rebuilt from it |
-| Audit | `Auditor` publishes who did what to which records (CloudEvents `vrixel.audit.v1`) to the product's Kafka audit topic; if a record can't be published the request fails with 503 | Access to PHI and payments data is on record, in an append-only, hash-chained store with an object-storage backup (ss-audit-sink) |
+| Audit | `Auditor` publishes who did what to which records (CloudEvents `valxel.audit.v1`) to the product's Kafka audit topic; if a record can't be published the request fails with 503 | Access to PHI and payments data is on record, in an append-only, hash-chained store with an object-storage backup (ss-audit-sink) |
 | Image | Multi-stage Dockerfile, Boot layers, distroless JRE, non-root | Small, cache-friendly, minimal attack surface |
 | Supply chain | Actions pinned by commit SHA, Gradle wrapper validation, dependency graph submission, dependency review, Dependabot | Known inputs; vulnerable dependencies are caught on the PR |
 
 ## Checks and how the pipeline reads them
 
-| Check | Where | Required | Read by the Vrixel SDLC as |
+| Check | Where | Required | Read by the Valxel SDLC as |
 | --- | --- | --- | --- |
 | `unit` | `ci.yml` | yes | the `unit` suite, with counts and coverage from `unit / report` |
 | `contract` | `ci.yml` | yes | the `contract` suite (`contract / report`) |
@@ -36,15 +36,15 @@ Everything below is wired to the platform's gates, so a new repo is deliverable 
 | `perf-smoke / report` | `perf.yml` | when the change needs it | the `perf-smoke` suite: this PR's image against main's |
 | `performance / report` | `post-deploy.yml` (staging) | when the change needs it | the `performance` suite: the staging load test |
 
-`post-deploy.yml` runs when the pipeline sends a `vrixel-deployed` repository dispatch after a
+`post-deploy.yml` runs when the pipeline sends a `valxel-deployed` repository dispatch after a
 deployment is ready (or by hand with **Run workflow**).
 
 ## Performance tests
 
-The Vrixel SDLC decides per change whether this repo needs a performance test: a hot path, a
+The Valxel SDLC decides per change whether this repo needs a performance test: a hot path, a
 migration, an upgrade or settings change gets the **smoke** test; an API contract change or a
 design that adds traffic gets the **staging load test** as well. It labels the pull request
-(`vrixel:perf-smoke`, `vrixel:perf-full`) and opens the report as pending; the workflows answer.
+(`valxel:perf-smoke`, `valxel:perf-full`) and opens the report as pending; the workflows answer.
 
 - **Smoke** (`perf.yml`, `perf/smoke.js`): the image built from main and the PR's image, side by
   side on one runner, 30 requests a second for a minute after a warm-up. Fails when the PR is more
@@ -75,7 +75,7 @@ identity provider. Secrets come from OpenChoreo secret references, never from th
 
 ## Security
 
-Every request is checked for **who**, **what** and **which record** (`com.vrixel.service.security`):
+Every request is checked for **who**, **what** and **which record** (`com.valxel.service.security`):
 
 1. **Who.** A JWT from the product's Keycloak realm (`APP_ISSUER`), checked against the realm's
    published keys (rotation is picked up by `kid`), not expired, and issued for this product:
@@ -107,7 +107,7 @@ metrics are on the management port (`MANAGEMENT_PORT`, 8081), which no endpoint 
 
 ## Feature flags
 
-The Vrixel SDLC creates a flag for each feature in the product's Flipt when its design is
+The Valxel SDLC creates a flag for each feature in the product's Flipt when its design is
 approved (on in dev and staging, off in production until release). Put the new behavior behind it:
 
 ```java
@@ -118,7 +118,7 @@ if (flags.enabled("emr.emr-feat-3.check-in-kiosk", user)) {
 }
 ```
 
-`com.vrixel.service.flags` reads flags over OFREP from the product's Flipt. Set per environment:
+`com.valxel.service.flags` reads flags over OFREP from the product's Flipt. Set per environment:
 `FLAGS_URL` (e.g. `http://flipt.emr.svc:8080`), `FLAGS_ENVIRONMENT` (e.g. `production`),
 `FLAGS_NAMESPACE` (e.g. `emr`) and, if the product's Flipt requires it for evaluation,
 `FLAGS_TOKEN`. Without `FLAGS_URL`, or when Flipt can't be reached, every flag reads as off. Each
@@ -136,13 +136,13 @@ ProductEvents.record("checkin_completed");
 ProductEvents.record("checkin_completed", Map.of("visit_type", "follow_up")); // categories only
 ```
 
-`com.vrixel.service.outcomes.ProductEvents` sends each event three ways, all counts:
+`com.valxel.service.outcomes.ProductEvents` sends each event three ways, all counts:
 
 | Where | What | The SDLC tool uses it to |
 | --- | --- | --- |
-| Counter `vrixel.events`, attribute `event` | Prometheus `vrixel_events_total{event="checkin_completed"}` | read a goal's metric (`sum(increase(vrixel_events_total{event="checkin_completed"}[$window]))`) |
-| One log line a minute | `vrixel.events {"checkin_completed":12}` | prove every event the PRD names fires in staging before G6 |
-| The request's flag cohorts | `"events":{"checkin_completed":9}` on each side of `vrixel.flag_cohorts` | compare how often users with a feature on do it against users with it off during a gradual release |
+| Counter `valxel.events`, attribute `event` | Prometheus `valxel_events_total{event="checkin_completed"}` | read a goal's metric (`sum(increase(valxel_events_total{event="checkin_completed"}[$window]))`) |
+| One log line a minute | `valxel.events {"checkin_completed":12}` | prove every event the PRD names fires in staging before G6 |
+| The request's flag cohorts | `"events":{"checkin_completed":9}` on each side of `valxel.flag_cohorts` | compare how often users with a feature on do it against users with it off during a gradual release |
 
 Names are lowercase words joined by `_` or `.`. Attributes are low-cardinality categories (a visit
 type, a plan): an attribute that names or identifies a person (a name, contact details, an id such
@@ -153,7 +153,7 @@ as `patient_id` or `user_id`) throws, as does a name in any other form. Tests us
 
 A request that changes state doesn't write a database. It checks the command, publishes one event
 saying what changed, and answers 202 Accepted once Kafka holds it on every in-sync replica
-(`com.vrixel.service.events`, example: `PUT /api/v1/greetings/{id}`):
+(`com.valxel.service.events`, example: `PUT /api/v1/greetings/{id}`):
 
 ```java
 Events.Published p = events.publish("patients", "registered", patientId, data, idempotencyKey);
@@ -161,12 +161,12 @@ return ResponseEntity.accepted().body(Accepted.of(p.eventId()));
 ```
 
 - Topic `<prefix>.<entity>.v1` (`EVENTS_TOPIC_PREFIX`, e.g. `emr.intake-api`), keyed by the record's
-  id so its changes stay in order; type `vrixel.<entity>.<what happened>.v1`.
+  id so its changes stay in order; type `valxel.<entity>.<what happened>.v1`.
 - Kafka doesn't confirm in time (`EVENTS_TIMEOUT_MS`): 503, nothing changed, and a `failure` audit
   record follows the change's record. Retries with the same `Idempotency-Key` from the same caller
   and tenant get the same event id, so workers apply them once; another caller's key never matches.
 - The data stores (Postgres, a search index, a cache) are kept by event workers, from
-  `vrixel-tools/template-event-worker`, and can be rebuilt by replaying the topic. Reads come from
+  `valxel-platform/template-event-worker`, and can be rebuilt by replaying the topic. Reads come from
   them, so a change shows up once a worker has applied it, usually within a second.
 - Never write to a database and to Kafka in the same request (constitution VX-16).
 
@@ -175,7 +175,7 @@ Settings: `EVENTS_SINK` (`kafka` in deployed environments, `log` locally), `EVEN
 
 ## Audit and tracing
 
-Record every read and change of product data with the `Auditor` (`com.vrixel.service.audit`):
+Record every read and change of product data with the `Auditor` (`com.valxel.service.audit`):
 
 ```java
 auditor.record("patient.read", Actor.user(jwt.getSubject()), "patient", List.of(patientId));
@@ -215,8 +215,8 @@ Sentry. Logs, traces and metrics stay in OpenChoreo.
 
 ## After creating a repo from this template
 
-1. Rename the package (`com.vrixel.service`) and the Pact provider name. The SDLC tool has already
-   put the component's name in the files `.vrixel/identity` lists (`rootProject.name`,
+1. Rename the package (`com.valxel.service`) and the Pact provider name. The SDLC tool has already
+   put the component's name in the files `.valxel/identity` lists (`rootProject.name`,
    `spring.application.name`, the Workload, CI); a repo created by hand needs them renamed.
 2. Replace the greeting example with your first endpoint, test first.
 3. Point `PactProviderTest` at your consumers' pacts (`@PactBroker` once you run a broker).
