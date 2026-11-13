@@ -6,8 +6,8 @@ plugins {
     alias(libs.plugins.spring.boot)
 }
 
-group = "com.vrixel"
-description = "Vrixel service template: Spring Boot API with tests, contracts and observability"
+group = "com.valxel"
+description = "Valxel service template: Spring Boot API with tests, contracts and observability"
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
@@ -26,7 +26,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
     implementation("org.apache.kafka:kafka-clients")
     implementation(libs.openfeature.sdk)
-    // Error reports to Sentry when SENTRY_DSN is set (com.vrixel.service.observability).
+    // Error reports to Sentry when SENTRY_DSN is set (com.valxel.service.observability).
     implementation(platform(libs.sentry.bom))
     implementation("io.sentry:sentry-spring-boot-4-starter")
     implementation("io.sentry:sentry-logback")

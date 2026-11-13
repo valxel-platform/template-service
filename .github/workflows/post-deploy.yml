@@ -1,4 +1,4 @@
-# Runs after the Vrixel SDLC deploys a commit: integration in dev, end-to-end in staging, smoke in
+# Runs after the Valxel SDLC deploys a commit: integration in dev, end-to-end in staging, smoke in
 # production. Results are posted on the deployed commit as "integration / report", "e2e / report"
 # and "smoke / report", which the pipeline's quality gates read. In staging, when the change needs
 # it (performance: full), the load test too: "performance / report".
@@ -6,7 +6,7 @@ name: post-deploy
 
 on:
   repository_dispatch:
-    types: [vrixel-deployed]
+    types: [valxel-deployed]
   workflow_dispatch:
     inputs:
       stage: { description: "dev, staging or production", required: true, type: choice, options: [dev, staging, production] }
@@ -59,7 +59,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: python3 .github/scripts/report.py --context "${{ steps.run.outputs.suite }} / report" --junit 'build/test-results/deployedTest/*.xml'
 
-  # The staging load test, when the Vrixel SDLC says the change needs one: the product's expected
+  # The staging load test, when the Valxel SDLC says the change needs one: the product's expected
   # peak scaled to staging (peak_rps x load_factor), judged against the budget and the last passing
   # run (kept on the perf-baselines branch; a pass becomes the next baseline).
   performance:

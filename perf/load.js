@@ -1,5 +1,5 @@
 // Staging load test (k6): the product's expected peak, scaled to staging's size
-// (TARGET_RPS = peak_rps x staging_load_factor, passed in by the Vrixel SDLC), for three minutes
+// (TARGET_RPS = peak_rps x staging_load_factor, passed in by the Valxel SDLC), for three minutes
 // after a warm-up. perf/compare.py judges it against the budget and the last release's run.
 // Reads and writes in the API's usual mix; writes use synthetic records and an idempotency key.
 import http from "k6/http";
