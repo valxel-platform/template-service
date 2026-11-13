@@ -17,6 +17,7 @@ Everything below is wired to the platform's gates, so a new repo is deliverable 
 | Deployed checks | `DeployedSmokeTest` (tag `deployed`) against `BASE_URL` | Integration in dev, end-to-end in staging, smoke in production |
 | Feature flags | OpenFeature with an OFREP provider for the product's Flipt (`FLAGS_URL`); `Flags.enabled(key, user)` | New behavior ships dark; the SDLC tool creates the flag and turns it on at release |
 | Observability | Actuator liveness and readiness, Prometheus metrics, ECS JSON logs with trace ids, OpenTelemetry traces (`spring-boot-starter-opentelemetry`) exported to the data plane's collector | Platform probes and dashboards work without extra setup; one request can be followed across services |
+| Product events | `ProductEvents.record("checkin_completed")`: a counter (`vrixel.events`), a summary line a minute and per-flag counts | The SDLC tool proves in staging that a feature's goal events fire, reads goals from them after release, and compares users with the feature on against off |
 | Events | Commands publish one CloudEvent to Kafka (`Events.publish`) and answer 202; event workers keep the data stores up to date. Kafka down means 503 and no change | No dual writes (VX-16): Kafka is the record, and every database can be rebuilt from it |
 | Audit | `Auditor` publishes who did what to which records (CloudEvents `vrixel.audit.v1`) to the product's Kafka audit topic; if a record can't be published the request fails with 503 | Access to PHI and payments data is on record, in an append-only, hash-chained store with an object-storage backup (ss-audit-sink) |
 | Image | Multi-stage Dockerfile, Boot layers, distroless JRE, non-root | Small, cache-friendly, minimal attack surface |
@@ -124,6 +125,29 @@ if (flags.enabled("emr.emr-feat-3.check-in-kiosk", user)) {
 answer is reused for `FLAGS_CACHE_SECONDS` (30) per flag and user, and a call to Flipt waits at most
 250 ms, so most requests don't call Flipt and a slow Flipt never slows a request by more. Tests
 set flags with OpenFeature's `InMemoryProvider` (see `FlagsTest`).
+
+## Product events: whether a feature moves its goal
+
+Each feature's PRD names the product goal it moves and the events that show it (its
+Instrumentation section); the HLD says which repo records each. Record them where they happen:
+
+```java
+ProductEvents.record("checkin_completed");
+ProductEvents.record("checkin_completed", Map.of("visit_type", "follow_up")); // categories only
+```
+
+`com.vrixel.service.outcomes.ProductEvents` sends each event three ways, all counts:
+
+| Where | What | The SDLC tool uses it to |
+| --- | --- | --- |
+| Counter `vrixel.events`, attribute `event` | Prometheus `vrixel_events_total{event="checkin_completed"}` | read a goal's metric (`sum(increase(vrixel_events_total{event="checkin_completed"}[$window]))`) |
+| One log line a minute | `vrixel.events {"checkin_completed":12}` | prove every event the PRD names fires in staging before G6 |
+| The request's flag cohorts | `"events":{"checkin_completed":9}` on each side of `vrixel.flag_cohorts` | compare how often users with a feature on do it against users with it off during a gradual release |
+
+Names are lowercase words joined by `_` or `.`. Attributes are low-cardinality categories (a visit
+type, a plan): an attribute that names or identifies a person (a name, contact details, an id such
+as `patient_id` or `user_id`) throws, as does a name in any other form. Tests use
+`ProductEvents.counting()` and `drain()` (see `ProductEventsTest`).
 
 ## Changing state: Kafka first
 
