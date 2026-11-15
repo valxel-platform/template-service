@@ -130,7 +130,8 @@ class OutboundTokensTest {
         gen.initialize(2048);
         KeyPair pair = gen.generateKeyPair();
         Path pem = dir.resolve("key.pem");
-        Files.writeString(pem, "-----BEGIN PRIVATE KEY-----\n"
+        // The key generated above, written as PEM for the test (not a real secret).
+        Files.writeString(pem, "-----BEGIN PRIVATE KEY-----\n" // gitleaks:allow
                 + Base64.getMimeEncoder().encodeToString(pair.getPrivate().getEncoded()) + "\n-----END PRIVATE KEY-----\n");
         tokens("", pem.toString()).tokenFor("consent", caller("user-token"));
         Map<String, String> form = requests.getFirst();

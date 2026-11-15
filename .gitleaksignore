@@ -1,0 +1,3 @@
+# Test fixtures that only look like secrets (gitleaks fingerprints: commit:file:rule:line).
+# New ones get a `gitleaks:allow` comment on the line instead.
+3b5f54f25b073f55cfd84e49aefd299753300883:src/test/java/com/vrixel/service/security/OutboundTokensTest.java:private-key:133
