@@ -21,18 +21,32 @@ public class Events {
     /** The published event's id and where it landed. */
     public record Published(String eventId, String type, EventSink.Position position) {}
 
+    /** Counts events per dataset and outcome (published, refused) for the platform's reconciliation. */
+    public interface Counted {
+        void count(String dataset, String outcome);
+    }
+
     private final EventSink sink;
     private final EventsProperties props;
     private final String service;
     private final Clock clock;
     private final TraceIds traceIds;
+    private final EventContracts contracts;
+    private final Counted counted;
 
     public Events(EventSink sink, EventsProperties props, String service, Clock clock, TraceIds traceIds) {
+        this(sink, props, service, clock, traceIds, EventContracts.none(), (dataset, outcome) -> {});
+    }
+
+    public Events(EventSink sink, EventsProperties props, String service, Clock clock, TraceIds traceIds,
+            EventContracts contracts, Counted counted) {
         this.sink = sink;
         this.props = props;
         this.service = service;
         this.clock = clock;
         this.traceIds = traceIds;
+        this.contracts = contracts;
+        this.counted = counted;
     }
 
     /**
@@ -42,10 +56,24 @@ public class Events {
      * it once.
      *
      * @throws EventsUnavailableException if Kafka doesn't confirm the event: the change did not happen
+     * @throws EventContracts.ContractViolationException if the data breaks its topic's data contract:
+     *     a bug here, and nothing is published
      */
     public Published publish(String entity, String what, String id, Map<String, ?> data, String idempotencyKey) {
         if (id == null || id.isBlank()) {
             throw new IllegalArgumentException("an event needs the id of the record it changes");
+        }
+        String topic = props.topic(entity);
+        Map<String, ?> body = data == null ? Map.of() : data;
+        EventContracts.Contract contract = contracts.forTopic(topic).orElse(null);
+        String dataset = contract == null ? topic : contract.dataset();
+        if (contract != null) {
+            try {
+                EventContracts.check(contract, body);
+            } catch (EventContracts.ContractViolationException e) {
+                counted.count(dataset, "refused");
+                throw e;
+            }
         }
         String singular = entity.endsWith("s") ? entity.substring(0, entity.length() - 1) : entity;
         String type = TYPE_PREFIX + singular + "." + what + ".v1";
@@ -64,7 +92,10 @@ public class Events {
         event.put("time", Instant.now(clock).toString());
         event.put("subject", subject);
         event.put("datacontenttype", "application/json");
-        event.put("data", data == null ? Map.of() : data);
+        if (contract != null) {
+            event.put("dataschema", contract.schemaId()); // which approved contract version it follows
+        }
+        event.put("data", body);
 
         // CloudEvents' Kafka binding: the ce_ headers let workers route and filter without parsing.
         Map<String, String> headers = new LinkedHashMap<>();
@@ -80,12 +111,13 @@ public class Events {
         }
         EventSink.Position at;
         try {
-            at = sink.publish(props.topic(entity), id, headers, Json.write(event));
+            at = sink.publish(topic, id, headers, Json.write(event));
         } catch (EventsUnavailableException e) {
             throw e;
         } catch (RuntimeException e) {
             throw new EventsUnavailableException("event could not be published", e);
         }
+        counted.count(dataset, "published");
         return new Published(eventId, type, at);
     }
 }
