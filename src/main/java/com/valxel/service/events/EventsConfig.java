@@ -53,9 +53,13 @@ public class EventsConfig {
         // The approved data contracts (contracts/ on the classpath, written by the SDLC tool).
         EventContracts contracts = EventContracts.load(EventsConfig.class.getClassLoader(), "contracts");
         MeterRegistry registry = meters.getIfAvailable();
-        Events.Counted counted = registry == null
-                ? (dataset, outcome) -> {}
-                : (dataset, outcome) -> registry.counter("valxel.dataset.events", "dataset", dataset, "outcome", outcome).increment();
+        DatasetCounts summary = DatasetCounts.reporting(); // the line the platform reconciles in staging
+        Events.Counted counted = (dataset, outcome) -> {
+            summary.count(dataset, outcome);
+            if (registry != null) {
+                registry.counter("valxel.dataset.events", "dataset", dataset, "outcome", outcome).increment();
+            }
+        };
         return new Events(sink, props, service, Clock.systemUTC(), () -> AuditConfig.traceContext(tracer.getIfAvailable()),
                 contracts, counted);
     }
