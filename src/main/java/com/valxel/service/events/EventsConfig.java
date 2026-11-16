@@ -1,6 +1,7 @@
 package com.valxel.service.events;
 
 import com.valxel.service.audit.AuditConfig;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.tracing.Tracer;
 import java.time.Clock;
 import java.time.Duration;
@@ -47,7 +48,15 @@ public class EventsConfig {
             EventSink sink,
             EventsProperties props,
             @Value("${spring.application.name}") String service,
-            ObjectProvider<Tracer> tracer) {
-        return new Events(sink, props, service, Clock.systemUTC(), () -> AuditConfig.traceContext(tracer.getIfAvailable()));
+            ObjectProvider<Tracer> tracer,
+            ObjectProvider<MeterRegistry> meters) {
+        // The approved data contracts (contracts/ on the classpath, written by the SDLC tool).
+        EventContracts contracts = EventContracts.load(EventsConfig.class.getClassLoader(), "contracts");
+        MeterRegistry registry = meters.getIfAvailable();
+        Events.Counted counted = registry == null
+                ? (dataset, outcome) -> {}
+                : (dataset, outcome) -> registry.counter("valxel.dataset.events", "dataset", dataset, "outcome", outcome).increment();
+        return new Events(sink, props, service, Clock.systemUTC(), () -> AuditConfig.traceContext(tracer.getIfAvailable()),
+                contracts, counted);
     }
 }

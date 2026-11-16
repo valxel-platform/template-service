@@ -160,6 +160,14 @@ Events.Published p = events.publish("patients", "registered", patientId, data, i
 return ResponseEntity.accepted().body(Accepted.of(p.eventId()));
 ```
 
+- Data contracts: a topic with an approved data contract (the HLD's Datasets, ODCS v3) has its
+  schema in `contracts/`, written by the SDLC tool and put on the classpath by the build, so
+  nothing reads GitHub at run time. `Events.publish` checks the data against it first. A property
+  the contract doesn't have, a missing required one or a wrong type throws
+  `ContractViolationException`, naming the field and never the value, and nothing is published
+  (a bug: 500). The event carries the contract's version in `dataschema`. Every event is counted
+  by dataset and outcome (`valxel_dataset_events_total{outcome="published|refused"}`) for the
+  platform's reconciliation.
 - Topic `<prefix>.<entity>.v1` (`EVENTS_TOPIC_PREFIX`, e.g. `emr.intake-api`), keyed by the record's
   id so its changes stay in order; type `valxel.<entity>.<what happened>.v1`.
 - Kafka doesn't confirm in time (`EVENTS_TIMEOUT_MS`): 503, nothing changed, and a `failure` audit
