@@ -1,0 +1,22 @@
+# The template conformance suite (.github/scripts/conformance.py, managed by the platform): the built
+# image does what every service repo must. The greetings are read with a token like a caller's.
+image: "template-service:ci"  # the tag CI builds
+command: "./gradlew bootRun"  # conformance.py local: the app as a process
+port: 8080
+ready: http://127.0.0.1:8081/actuator/health
+metrics: http://127.0.0.1:8081/actuator/prometheus
+audience: conformance-api
+env:
+  APP_ISSUER: "{issuer}"
+  APP_AUDIENCE: "{audience}"
+  AUDIT_SINK: log
+  FLAGS_URL: "{ofrep}"
+  PRODUCT: conformance
+  ENVIRONMENT: ci
+  MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: "{otlp}/v1/traces"
+steps:
+  - method: GET
+    path: /api/v1/greetings?name=Ana
+    token: {scope: "greetings:read", organization: {north-clinic: {}}}
+# No product event or flag yet: the example code records and evaluates none (a feature adds its own).
+checks: [audit, tracing]
