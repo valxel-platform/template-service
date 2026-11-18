@@ -14,7 +14,7 @@ env:
   MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: "{otlp}/v1/traces"
 steps:
   - method: GET
-    path: /api/v1/greetings
+    path: /api/v1/greetings?name=Ana
     token: {scope: "greetings:read", organization: {north-clinic: {}}}
 # No product event or flag yet: the example code records and evaluates none (a feature adds its own).
 checks: [audit, tracing]
