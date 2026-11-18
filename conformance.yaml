@@ -1,5 +1,7 @@
 # The template conformance suite (.github/scripts/conformance.py, managed by the platform): the built
 # image does what every service repo must. The greetings are read with a token like a caller's.
+image: "template-service:ci"  # the tag CI builds
+command: "./gradlew bootRun"  # conformance.py local: the app as a process
 port: 8080
 ready: http://127.0.0.1:8081/actuator/health
 metrics: http://127.0.0.1:8081/actuator/prometheus
