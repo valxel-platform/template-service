@@ -61,6 +61,7 @@ tasks.test {
     // The audit events the tests build (AuditSchemaContractTest) are an output: a test run restored
     // from the build cache restores them too, for CI's check against the shared schema.
     outputs.dir(layout.buildDirectory.dir("audit-events"))
+    outputs.dir(layout.buildDirectory.dir("contract-lines"))
     useJUnitPlatform { excludeTags("contract", "deployed") }
     finalizedBy(tasks.jacocoTestReport)
 }
