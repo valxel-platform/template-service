@@ -21,7 +21,8 @@ COPY --chown=nonroot:nonroot --from=build /extracted/spring-boot-loader/ /app/
 COPY --chown=nonroot:nonroot --from=build /extracted/snapshot-dependencies/ /app/
 COPY --chown=nonroot:nonroot --from=build /extracted/application/ /app/
 WORKDIR /app
-USER nonroot
+# Distroless's nonroot user, by number: Kubernetes can only verify runAsNonRoot for a numeric user.
+USER 65532:65532
 # Class data sharing: start the application once, up to its refresh (no network, no listening),
 # and keep the classes it loaded in an archive. Starting from the archive is markedly faster, which
 # matters when OpenChoreo adds replicas under load. Security off for the training run only.
