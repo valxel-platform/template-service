@@ -2,7 +2,7 @@
 # Manual edits can break the build and are not advised.
 # This file is expected to be part of source control.
 # To regenerate this file, run: ./gradlew :dependencies --write-locks
-at.yawk.lz4:lz4-java:1.14.0=productionRuntimeClasspath,runtimeClasspath,testRuntimeClasspath
+at.yawk.lz4:lz4-java:1.14.1=productionRuntimeClasspath,runtimeClasspath,testRuntimeClasspath
 au.com.dius.pact.core:matchers:4.7.6=testCompileClasspath,testRuntimeClasspath
 au.com.dius.pact.core:model:4.7.6=testCompileClasspath,testRuntimeClasspath
 au.com.dius.pact.core:pactbroker:4.7.6=testCompileClasspath,testRuntimeClasspath
