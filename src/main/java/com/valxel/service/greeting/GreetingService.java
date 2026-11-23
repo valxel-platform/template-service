@@ -1,6 +1,9 @@
 package com.valxel.service.greeting;
 
 import com.valxel.service.config.InvalidRequestException;
+import com.valxel.service.flags.Flags;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /** Business logic lives in services, free of HTTP concerns, so it is cheap to unit test. */
@@ -9,6 +12,38 @@ public class GreetingService {
 
     static final int MAX_NAME = 100;
     static final int MAX_MESSAGE = 200;
+
+    private final Flags flags;
+    private final String product;
+
+    /** No flags: every feature reads as off (unit tests). */
+    public GreetingService() {
+        this(null, "");
+    }
+
+    @Autowired
+    public GreetingService(Flags flags, @Value("${app.audit.product:}") String product) {
+        this.flags = flags;
+        this.product = product == null ? "" : product;
+    }
+
+    /**
+     * The example feature's flag. It shows the pattern every feature follows: the tool gives the
+     * feature a flag in the product's Flipt (on in dev and staging, off in production until it's
+     * released) and the new behaviour reads it. Replace it with your first feature's own.
+     */
+    public static String exampleFlag(String product) {
+        return (product == null || product.isBlank() ? "example" : product) + ".example.greeting-welcome-back";
+    }
+
+    /** The greeting for this caller: the example feature, behind its flag, adds a welcome. */
+    public Greeting greet(String name, String user) {
+        Greeting greeting = greet(name);
+        if (flags != null && flags.enabled(exampleFlag(product), user)) {
+            return new Greeting(greeting.message() + " Welcome back.");
+        }
+        return greeting;
+    }
 
     public Greeting greet(String name) {
         String trimmed = name.strip();
