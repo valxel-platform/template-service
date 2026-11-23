@@ -18,5 +18,6 @@ steps:
   - method: GET
     path: /api/v1/greetings?name=Ana
     token: {scope: "greetings:read", organization: {north-clinic: {}}}
-# No product event or flag yet: the example code records and evaluates none (a feature adds its own).
-checks: [audit, tracing]
+# Reading a greeting reads the example feature's flag (GreetingService.exampleFlag). No product
+# event yet: the example code records none (a feature adds its own).
+checks: [audit, tracing, flags]

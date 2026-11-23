@@ -58,7 +58,7 @@ public class GreetingController {
     @GetMapping
     @PreAuthorize("hasAuthority('SCOPE_greetings:read')")
     public Greeting greet(@RequestParam @NotBlank @Size(max = 100) String name, Principal caller) {
-        Greeting greeting = service.greet(name);
+        Greeting greeting = service.greet(name, caller == null ? "" : caller.getName());
         auditor.record("greeting.read", callers.actor(caller), "greeting", List.of());
         return greeting;
     }
