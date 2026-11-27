@@ -28,6 +28,12 @@ class ManagementPortTest {
 
     private final HttpClient http = HttpClient.newHttpClient();
 
+    private String body(String port, String path) throws Exception {
+        return http.send(HttpRequest.newBuilder(URI.create("http://localhost:" + env.getProperty(port) + path)).build(),
+                        HttpResponse.BodyHandlers.ofString())
+                .body();
+    }
+
     private int get(String port, String path) throws Exception {
         return http.send(HttpRequest.newBuilder(URI.create("http://localhost:" + env.getProperty(port) + path)).build(),
                         HttpResponse.BodyHandlers.discarding())
@@ -40,5 +46,18 @@ class ManagementPortTest {
         assertThat(get("local.management.port", "/actuator/prometheus")).isEqualTo(200);
         assertThat(get("local.server.port", "/actuator/prometheus")).isIn(401, 403, 404);
         assertThat(get("local.server.port", "/api/v1/greetings?name=Ada")).isEqualTo(401);
+    }
+
+    /** Requests by route and status, in the buckets the Python templates use too (http_metrics.py). */
+    @Test
+    void requestsAreMeasuredByRouteInTheSharedBuckets() throws Exception {
+        get("local.server.port", "/api/v1/greetings?name=Ada");
+        String metrics = body("local.management.port", "/actuator/prometheus");
+        assertThat(metrics).contains("http_server_requests_seconds_bucket{")
+                .contains("uri=\"/api/v1/greetings\"")
+                .contains("status=\"401\"")
+                .contains("le=\"0.005\"")
+                .contains("le=\"0.25\"")
+                .contains("le=\"10.0\"");
     }
 }
