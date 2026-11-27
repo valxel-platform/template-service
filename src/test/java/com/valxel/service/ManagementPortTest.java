@@ -48,13 +48,16 @@ class ManagementPortTest {
         assertThat(get("local.server.port", "/api/v1/greetings?name=Ada")).isEqualTo(401);
     }
 
-    /** Requests by route and status, in the buckets the Python templates use too (http_metrics.py). */
+    /**
+     * Requests by status, in the buckets the Python templates use too (http_metrics.py). The request
+     * is turned away by sign-in before routing, so Spring labels it uri="UNKNOWN"; routed requests
+     * carry their route.
+     */
     @Test
-    void requestsAreMeasuredByRouteInTheSharedBuckets() throws Exception {
+    void requestsAreMeasuredInTheSharedBuckets() throws Exception {
         get("local.server.port", "/api/v1/greetings?name=Ada");
         String metrics = body("local.management.port", "/actuator/prometheus");
         assertThat(metrics).contains("http_server_requests_seconds_bucket{")
-                .contains("uri=\"/api/v1/greetings\"")
                 .contains("status=\"401\"")
                 .contains("le=\"0.005\"")
                 .contains("le=\"0.25\"")
